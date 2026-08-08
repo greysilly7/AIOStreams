@@ -46,7 +46,7 @@ let
     AIOSTREAMS_AUTH =
       if cfg.user != null then "${cfg.user.username}:${cfg.user.password}" else null;
   }
-  // cfg.extraEnvironment;
+  // cfg.extraEnv;
 in
 {
   options.services.aiostreams = {
