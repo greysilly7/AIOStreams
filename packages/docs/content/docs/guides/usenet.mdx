@@ -47,6 +47,7 @@ There are three flavours of Usenet playback in AIOStreams:
 1. **NNTP streaming** — something downloads articles from your provider and converts them into an HTTP stream on the fly. That something is either **AIOStreams itself** (the [built-in engine](#the-built-in-engine-aiostreams)), an [external self-hosted tool](#nzbdav-altmount-and-stremthru-newz) (NzbDAV, AltMount, StremThru Newz), or — uniquely — the **Stremio client itself** ([Stremio NNTP](#stremio-nntp)). You bring your own provider account(s) and indexers.
 2. **Easynews** — a provider with its own web search whose results are direct HTTP URLs served from Easynews' servers. No extra software, no hosting; accessed through the [Easynews Search addon](#easynews).
 3. **TorBox** — AIOStreams hands TorBox an NZB URL; TorBox downloads the whole release to _their_ servers, after which it is "cached" and plays back instantly from them, on any device. See [TorBox](#torbox).
+4. **RSDebrid** — a self-hosted download manager: AIOStreams hands it torrents and NZBs, it downloads to _your own_ servers, and plays back instantly once complete. See [RSDebrid](#rsdebrid).
 
 All of the NNTP streamers pull articles straight from your provider — the difference is which piece of software does the streaming, and therefore where it has to run:
 
@@ -56,6 +57,7 @@ All of the NNTP streamers pull articles straight from your provider — the diff
 | **NzbDAV / AltMount / StremThru Newz** | Streams over NNTP from your provider                 | The tool's server         | A self-hosted tool, a provider, indexers                                                                             |
 | **Stremio NNTP**                       | Streams over NNTP from your provider                 | Inside the Stremio client | Stremio Desktop v5 or Android TV, a provider, indexers                                                               |
 | **TorBox**                             | Full download to TorBox first, then instant playback | TorBox's servers          | A TorBox Pro plan                                                                                                    |
+| **RSDebrid**                           | Full download to your RSDebrid server first, then instant playback | Your own server | A self-hosted RSDebrid instance, indexers                                                                           |
 | **Easynews**                           | Direct HTTP from Easynews                            | Easynews' servers         | An Easynews subscription                                                                                             |
 
 <Callout type="info">
@@ -63,7 +65,9 @@ All of the NNTP streamers pull articles straight from your provider — the diff
   ElfHosted one), the **built-in engine** is the simplest full-control option —
   no extra software to install. If you can't host anything, **TorBox Pro** or
   **Easynews** work from any device, and **Stremio NNTP** works with just a
-  provider if you're on a supported Stremio client.
+  provider if you're on a supported Stremio client. If you already self-host,
+  **RSDebrid** adds torrent support to your Usenet setup from your own
+  hardware.
 </Callout>
 
 ## 2. Set Up Your Service
@@ -394,6 +398,46 @@ Since your AIOStreams instance is what generates and serves those NZBs, this req
   HTTP downloads behind their web search are just one way in. You can use their
   NNTP server details with any NNTP-based service in this guide, exactly like
   any other provider.
+</Callout>
+
+### RSDebrid
+
+[RSDebrid](https://rsdebrid.com) is a self-hosted download manager: you run it on your own servers, and it downloads **both torrents and Usenet releases** for you. AIOStreams treats it like a debrid service — with no per-download fees, because it runs on your hardware. Because it is your own instance, results it has already downloaded (torrents added by hash, or NZBs it has imported) count as cached; everything it hasn't seen yet is uncached — the download starts on demand, and you can use **Cache and Play** (under **Services → Built-in → Cache and Play**) to wait for it instead of restarting the stream.
+
+**Setup:**
+
+<Steps>
+  <Step>Have RSDebrid running somewhere reachable, and note its API URL (and API
+    key, if your instance requires one).</Step>
+  <Step>
+    In AIOStreams, go to **Services** and add the **RSDebrid** service. Enter
+    the API URL — it is required. An optional **Public URL** can be set when
+    RSDebrid is reachable at a different address from outside your network than
+    from AIOStreams itself; it is what players are pointed at.
+  </Step>
+  <Step>
+    Add Usenet addons — Newznab and friends for your own indexers. Torrent
+    results from Torznab and other torrent addons play through RSDebrid the
+    same way.
+  </Step>
+</Steps>
+
+Your API key is only ever sent as a request header (a `Bearer` token) to your
+RSDebrid instance — it is never embedded in URLs. Instances without an API key
+work with the **API Key** field left empty.
+
+<Callout type="warn">
+  Cached/uncached status is per **your own** RSDebrid library: a release that
+  another RSDebrid user has downloaded is still "uncached" for you until
+  you've downloaded it yourself, so don't be surprised if the first play of
+  popular content still has to download.
+</Callout>
+
+<Callout type="warn">
+  **Cache and Play** here waits on RSDebrid — and your player may time out
+  before a slow download finishes. A player that gives up after ~30 seconds
+  (e.g. the Stremio iOS app) may need a manual stream restart once the
+  download is complete.
 </Callout>
 
 ### Zero Setup: The ElfHosted Bundle

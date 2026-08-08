@@ -256,6 +256,15 @@ export class BuiltinAddonPreset extends Preset {
             aiostreamsAuth: credentials.aiostreamsAuth,
           })
         ),
+      [constants.RSDEBRID_SERVICE]: (credentials: any) =>
+        toUrlSafeBase64(
+          JSON.stringify({
+            url: credentials.url,
+            publicUrl: credentials.publicUrl,
+            apiKey: credentials.apiKey,
+            aiostreamsAuth: credentials.aiostreamsAuth,
+          })
+        ),
     };
     const altmountSpecialCase: Partial<
       Record<ServiceId, (credentials: any) => any>

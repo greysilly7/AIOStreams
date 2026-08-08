@@ -4,6 +4,7 @@ export * from './stremthru.js';
 export * from './torbox.js';
 export * from './nzbdav.js';
 export * from './altmount.js';
+export * from './rsdebrid.js';
 export * from './aiostreams.js';
 
 import {
@@ -19,6 +20,7 @@ import { TorboxDebridService } from './torbox.js';
 import { StremThruPreset } from '../presets/stremthru.js';
 import { NzbDAVService } from './nzbdav.js';
 import { AltmountService } from './altmount.js';
+import { RSDebridService } from './rsdebrid.js';
 import { StremioNNTPService } from './stremio-nntp.js';
 import { EasynewsService } from './easynews.js';
 import { NativeUsenetService } from './aiostreams.js';
@@ -73,6 +75,11 @@ export function getDebridService(
       return new AltmountService(config, {
         pollingInterval: pollInterval,
         maxWaitTime: maxWaitTime,
+      });
+    case 'rsdebrid':
+      return new RSDebridService(config, {
+        pollInterval,
+        maxWaitTime,
       });
     case 'stremio_nntp':
       return new StremioNNTPService(config);

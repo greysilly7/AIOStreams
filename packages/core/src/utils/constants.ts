@@ -324,6 +324,7 @@ const SEEDR_SERVICE = 'seedr';
 const EASYNEWS_SERVICE = 'easynews';
 const NZBDAV_SERVICE = 'nzbdav';
 const ALTMOUNT_SERVICE = 'altmount';
+const RSDEBRID_SERVICE = 'rsdebrid';
 const STREMIO_NNTP_SERVICE = 'stremio_nntp';
 const STREMTHRU_NEWZ_SERVICE = 'stremthru_newz';
 const AIOSTREAMS_SERVICE = 'aiostreams';
@@ -344,6 +345,7 @@ const SERVICES = [
   EASYNEWS_SERVICE,
   NZBDAV_SERVICE,
   ALTMOUNT_SERVICE,
+  RSDEBRID_SERVICE,
   STREMIO_NNTP_SERVICE,
   STREMTHRU_NEWZ_SERVICE,
   AIOSTREAMS_SERVICE,
@@ -362,6 +364,7 @@ export const BUILTIN_SUPPORTED_SERVICES = [
   OFFCLOUD_SERVICE,
   NZBDAV_SERVICE,
   ALTMOUNT_SERVICE,
+  RSDEBRID_SERVICE,
   STREMIO_NNTP_SERVICE,
   EASYNEWS_SERVICE,
   STREMTHRU_NEWZ_SERVICE,
@@ -693,6 +696,57 @@ const SERVICE_DETAILS: Record<
         name: 'AIOStreams Auth Token (Optional)',
         description:
           'If you would like to proxy your AltMount streams, you will need to provide a username:password pair for your AIOStreams instance, defined in the `AIOSTREAMS_AUTH` environment variable. **Other proxies will not work and you must define it here only**',
+        type: 'password',
+        required: false,
+      },
+    ],
+  },
+
+  [RSDEBRID_SERVICE]: {
+    id: RSDEBRID_SERVICE,
+    name: 'RSDebrid',
+    shortName: 'RSD',
+    knownNames: ['RSD', 'RSDebrid'],
+    signUpText:
+      'Self-hosted torrent and usenet download service. No sign-up required — deploy it yourself and enter its URL here.',
+    credentials: [
+      {
+        id: 'note',
+        name: 'Configuration Help',
+        description: `**URL:** Use an internal URL for local setups (e.g., http://rsdebrid:8080), otherwise use a public URL.\n\n**Public URL:** Only needed if URL is local but streams need to be publicly accessible. Leave blank if URL is public or using a proxy.\n\n**API key:** Optional. Only required if your rsdebrid instance has an \`api_key\` configured; leave blank for unauthenticated instances.\n\n**Security Note:** The API key is exposed in proxied stream requests unless you use the built-in proxy. To proxy, provide the Auth Token below (built-in proxy only).`,
+        type: 'alert',
+        intent: 'info',
+        required: false,
+      },
+      {
+        id: 'url',
+        name: 'RSDebrid URL',
+        description:
+          'The base URL of your rsdebrid instance. E.g., http://rsdebrid:8080',
+        type: 'string',
+        required: true,
+      },
+      {
+        id: 'publicUrl',
+        name: 'Public RSDebrid URL (Optional)',
+        description:
+          'The public URL of your rsdebrid instance. Optional, see note above for details.',
+        type: 'string',
+        required: false,
+      },
+      {
+        id: 'apiKey',
+        name: 'RSDebrid API Key (Optional)',
+        description:
+          'Your rsdebrid api_key, if your instance has one configured. Leave blank if unauthenticated.',
+        type: 'password',
+        required: false,
+      },
+      {
+        id: 'aiostreamsAuth',
+        name: 'AIOStreams Auth Token (Optional)',
+        description:
+          'If you would like to proxy your rsdebrid streams, you will need to provide a username:password pair for your AIOStreams instance, defined in the `AIOSTREAMS_AUTH` environment variable. **Other proxies will not work and you must define it here only**',
         type: 'password',
         required: false,
       },
@@ -1735,6 +1789,7 @@ export {
   SEEDR_SERVICE,
   NZBDAV_SERVICE,
   ALTMOUNT_SERVICE,
+  RSDEBRID_SERVICE,
   STREMIO_NNTP_SERVICE,
   EASYNEWS_SERVICE,
   STREMTHRU_NEWZ_SERVICE,
