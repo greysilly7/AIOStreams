@@ -44,7 +44,7 @@ let
     REDIS_URI = cfg.redisUrl;
     SECRET_KEY = cfg.secretKey;
     AIOSTREAMS_AUTH =
-      if cfg.user != null then "${cfg.user.username}:${cfg.user.password}" else null;
+      if cfg.authUser != null then "${cfg.authUser.username}:${cfg.authUser.password}" else null;
   }
   // cfg.extraEnv;
 in
