@@ -36,6 +36,10 @@ pkgs.stdenv.mkDerivation {
     export HOME="$PWD"
     export npm_config_store_dir="$pnpmDeps"
     export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+    # pnpm's own "manage-package-manager-versions" tries to fetch/verify the
+    # exact packageManager-pinned pnpm release from the registry, which the
+    # offline build sandbox can't reach — nixpkgs' pnpm is close enough.
+    export npm_config_manage_package_manager_versions=false
 
     # offline install against the prefetched pnpm store; native scripts run so
     # better-sqlite3 compiles its bundled sqlite3.c in the build sandbox
