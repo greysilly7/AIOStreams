@@ -52,30 +52,19 @@ pkgs.stdenv.mkDerivation {
     # pnpmConfigHook already materialized node_modules from pnpmDeps'
     # rehydrated store during configurePhase — but it hardcodes
     # --ignore-scripts on that install by design (a config hook shouldn't
-    # run arbitrary scripts automatically). This re-check is just a fast
-    # no-op against the already-satisfied lockfile.
-    pnpm install --offline --frozen-lockfile
-
-    # Explicitly trigger the native builds pnpmConfigHook deliberately
-    # skipped, for exactly the onlyBuiltDependencies-allowlisted packages
-    # (see pnpm-workspace.yaml). Without this, e.g. yencode's
-    # build/Release/yencode.node never gets compiled, with no error.
-    #
-    # `pnpm rebuild <names>` alone is scoped to the CURRENT package only
-    # (same as any other pnpm command) — from the workspace root, none of
-    # these are direct root dependencies, so it silently matches nothing
-    # and exits 0. `-r` (recursive across all workspace members) does
-    # reach them, but also re-runs every workspace package's OWN
-    # lifecycle scripts (packages/server's prepublish, packages/docs'
-    # postinstall) as a side effect, breaking build ordering. Scoping
-    # via --filter to just the two packages that actually declare these
-    # dependencies (core: bcrypt/better-sqlite3/core-js/sharp/sqlite3/
-    # unrs-resolver/yencode; seanime-extensions: esbuild) reaches them
-    # without touching any other workspace member's scripts — neither
-    # of these two packages has an install-family lifecycle script of
-    # its own to worry about.
-    pnpm --filter core --filter seanime-extensions rebuild \
-      bcrypt better-sqlite3 core-js esbuild sharp sqlite3 unrs-resolver yencode
+    # run arbitrary scripts automatically). A plain re-install here is a
+    # no-op against the already-satisfied lockfile and does NOT pick up
+    # the deferred native builds (bcrypt/better-sqlite3/sharp/sqlite3/
+    # yencode/etc — see pnpm-workspace.yaml's onlyBuiltDependencies):
+    # confirmed via debug markers that neither a plain re-install nor
+    # `pnpm rebuild <names>` (scoped various ways: unscoped, -r,
+    # --filter) does anything — pnpm appears to only treat a package as
+    # "pending its build script" when the *allowlist* was what blocked
+    # it, not when a blanket --ignore-scripts flag did. --force makes
+    # pnpm fully re-link/re-process node_modules against the current
+    # (non-ignore-scripts) settings instead of short-circuiting on
+    # "lockfile already satisfied".
+    pnpm install --offline --frozen-lockfile --force
     pnpm run metadata
     pnpm build
 
