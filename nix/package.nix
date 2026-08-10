@@ -56,32 +56,40 @@ pkgs.stdenv.mkDerivation {
     # the ephemeral build copy.
     sed -i '/"packageManager":/d' package.json
 
-    # Re-run the install without --ignore-scripts to build the plain
-    # onlyBuiltDependencies packages (bcrypt/better-sqlite3/sharp/sqlite3/
-    # core-js/esbuild/unrs-resolver). --force is required: a plain
-    # re-install treats the lockfile as already satisfied and skips
-    # everything, since pnpmConfigHook already materialized node_modules
-    # (just without scripts).
+    # Re-run the install without --ignore-scripts to build the
+    # onlyBuiltDependencies packages (see pnpm-workspace.yaml). --force
+    # is required: a plain re-install treats the lockfile as already
+    # satisfied and skips everything, since pnpmConfigHook already
+    # materialized node_modules (just without scripts). This reliably
+    # builds most of them (bcrypt, sharp, core-js, esbuild, sqlite3,
+    # unrs-resolver — verified via their compiled binaries surviving
+    # into $out).
     pnpm install --offline --frozen-lockfile --force
 
-    # yencode is the one onlyBuiltDependencies entry that's also a
-    # patched dependency (patchedDependencies), and its build/ directory
-    # never gets created via pnpm's own install/rebuild machinery no
-    # matter how it's invoked or scoped — node-gyp simply never starts
-    # for it. Rather than fight pnpm's allowlist-matching for a patched
-    # package further, build it directly: find wherever pnpm placed it
-    # in the content-addressed store and run its own install script
-    # (node-gyp rebuild) by hand. `pnpm --dir ... run install` (not a
-    # bare `node-gyp rebuild`) reuses pnpm's own PATH/env setup for
-    # locating node-gyp — the same mechanism that already successfully
-    # builds bcrypt above; a bare `node-gyp` isn't on PATH itself.
-    yencode_dir=$(find node_modules/.pnpm -maxdepth 1 -iname 'yencode@*' -print -quit)
-    if [ -z "$yencode_dir" ]; then
-      echo "ERROR: yencode not found under node_modules/.pnpm" >&2
-      exit 1
-    fi
-    pnpm --dir "$yencode_dir/node_modules/yencode" run install
-    test -f "$yencode_dir/node_modules/yencode/build/Release/yencode.node"
+    # better-sqlite3 and yencode are the two onlyBuiltDependencies
+    # entries whose build/ directory never gets created no matter how
+    # `pnpm install --force`/`pnpm rebuild` is invoked or scoped —
+    # confirmed by direct testing, not assumed. Both have real install
+    # scripts (better-sqlite3: "prebuild-install || node-gyp rebuild",
+    # yencode: "node-gyp rebuild", plus yencode is also a patched
+    # dependency). Build each directly: find wherever pnpm placed it in
+    # the content-addressed store and run its own install script by
+    # hand. `pnpm --dir <path> run install` (not a bare `node-gyp
+    # rebuild`) reuses pnpm's own PATH/env setup for locating
+    # node-gyp — a bare `node-gyp` isn't on PATH outside that.
+    buildPnpmDep() {
+      local name="$1" nodeFile="$2"
+      local dir
+      dir=$(find node_modules/.pnpm -maxdepth 1 -iname "''${name}@*" -print -quit)
+      if [ -z "$dir" ]; then
+        echo "ERROR: $name not found under node_modules/.pnpm" >&2
+        exit 1
+      fi
+      pnpm --dir "$dir/node_modules/$name" run install
+      test -f "$dir/node_modules/$name/$nodeFile"
+    }
+    buildPnpmDep better-sqlite3 build/Release/better_sqlite3.node
+    buildPnpmDep yencode build/Release/yencode.node
 
     pnpm run metadata
     pnpm build
