@@ -19,6 +19,10 @@
       src = nixpkgs.lib.cleanSourceWith {
         src = ./.;
         filter = path: type:
+          let
+            relPath = nixpkgs.lib.removePrefix (toString ./. + "/") (toString path);
+          in
+          # These get excluded anywhere in the tree (build/dep artifacts).
           !(type == "directory"
             && builtins.elem (baseNameOf path)
             [
@@ -26,11 +30,12 @@
               "dist"
               "coverage"
               ".pnpm-store"
-              "data"
-              "cache"
               ".git"
-              "uploads"
-            ]);
+            ])
+          # These only mean "local runtime state" at the repo root — matching
+          # by bare name anywhere also strips real source dirs that happen to
+          # share the name, e.g. packages/frontend/src/app/dashboard/cache.
+          && !(type == "directory" && builtins.elem relPath [ "data" "cache" "uploads" ]);
       };
     in
     {
