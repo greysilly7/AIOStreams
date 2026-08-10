@@ -186,7 +186,10 @@ in
         RestrictSUIDSGID = true;
         RestrictRealtime = true;
         RestrictNamespaces = true;
-        MemoryDenyWriteExecute = true;
+        # V8's JIT needs W^X-toggling mprotect() calls; MemoryDenyWriteExecute
+        # blocks exactly that via seccomp, crashing Node with SIGTRAP on
+        # startup before it can even bind the listener.
+        MemoryDenyWriteExecute = false;
         LockPersonality = true;
         CapabilityBoundingSet = "";
         RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
