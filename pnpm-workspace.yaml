@@ -10,6 +10,7 @@ onlyBuiltDependencies:
   - sqlite3
   - unrs-resolver
   - yencode
+  - yencode@1.2.4
 
 patchedDependencies:
   stremthru: patches/stremthru.patch
