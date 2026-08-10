@@ -58,13 +58,16 @@ pkgs.stdenv.mkDerivation {
 
     # Explicitly trigger the native builds pnpmConfigHook deliberately
     # skipped, for exactly the onlyBuiltDependencies-allowlisted packages
-    # (bcrypt, better-sqlite3, sharp, sqlite3, yencode, etc. — see
-    # pnpm-workspace.yaml). Without this, e.g. yencode's
+    # (see pnpm-workspace.yaml). Without this, e.g. yencode's
     # build/Release/yencode.node never gets compiled, with no error.
-    # -r is required: plain `pnpm rebuild` only scopes to the workspace
-    # root, and yencode/better-sqlite3/etc. are packages/core's
-    # dependencies, not the root's — without -r this silently no-ops.
-    pnpm rebuild -r
+    # Named explicitly rather than `pnpm rebuild -r`: `-r` also re-runs
+    # every *workspace package's own* lifecycle scripts recursively
+    # (packages/server's prepublish, packages/docs' postinstall), which
+    # both duplicates the real `pnpm build` below and breaks build
+    # ordering (server's prepublish ran before core existed to build
+    # against). Naming the actual dependencies rebuilds them wherever
+    # they sit in the tree without that side effect.
+    pnpm rebuild bcrypt better-sqlite3 core-js esbuild sharp sqlite3 unrs-resolver yencode
     pnpm run metadata
     pnpm build
 
