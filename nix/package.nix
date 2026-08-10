@@ -71,13 +71,16 @@ pkgs.stdenv.mkDerivation {
     # for it. Rather than fight pnpm's allowlist-matching for a patched
     # package further, build it directly: find wherever pnpm placed it
     # in the content-addressed store and run its own install script
-    # (node-gyp rebuild) by hand.
+    # (node-gyp rebuild) by hand. `pnpm --dir ... run install` (not a
+    # bare `node-gyp rebuild`) reuses pnpm's own PATH/env setup for
+    # locating node-gyp — the same mechanism that already successfully
+    # builds bcrypt above; a bare `node-gyp` isn't on PATH itself.
     yencode_dir=$(find node_modules/.pnpm -maxdepth 1 -iname 'yencode@*' -print -quit)
     if [ -z "$yencode_dir" ]; then
       echo "ERROR: yencode not found under node_modules/.pnpm" >&2
       exit 1
     fi
-    ( cd "$yencode_dir/node_modules/yencode" && node-gyp rebuild )
+    pnpm --dir "$yencode_dir/node_modules/yencode" run install
     test -f "$yencode_dir/node_modules/yencode/build/Release/yencode.node"
 
     pnpm run metadata
