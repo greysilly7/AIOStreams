@@ -30,11 +30,11 @@ pkgs.stdenv.mkDerivation {
     nodejs
     pnpm
     pkgs.pnpmConfigHook
-    pkgs.python3 # node-gyp (better-sqlite3) compile
+    pkgs.python3 # node-gyp (better-sqlite3, yencode) compile
     pkgs.gcc13 # C toolchain for native modules
     # yencode bundles crcutil as a C dependency, bootstrapped via
     # autotools (configure/Makefile.am/autogen.sh) before node-gyp
-    # links against it — none of these were previously available.
+    # links against it.
     pkgs.autoconf
     pkgs.automake
     pkgs.libtool
@@ -56,22 +56,30 @@ pkgs.stdenv.mkDerivation {
     # the ephemeral build copy.
     sed -i '/"packageManager":/d' package.json
 
-    # pnpmConfigHook already materialized node_modules from pnpmDeps'
-    # rehydrated store during configurePhase — but it hardcodes
-    # --ignore-scripts on that install by design (a config hook shouldn't
-    # run arbitrary scripts automatically). A plain re-install here is a
-    # no-op against the already-satisfied lockfile and does NOT pick up
-    # the deferred native builds (bcrypt/better-sqlite3/sharp/sqlite3/
-    # yencode/etc — see pnpm-workspace.yaml's onlyBuiltDependencies):
-    # confirmed via debug markers that neither a plain re-install nor
-    # `pnpm rebuild <names>` (scoped various ways: unscoped, -r,
-    # --filter) does anything — pnpm appears to only treat a package as
-    # "pending its build script" when the *allowlist* was what blocked
-    # it, not when a blanket --ignore-scripts flag did. --force makes
-    # pnpm fully re-link/re-process node_modules against the current
-    # (non-ignore-scripts) settings instead of short-circuiting on
-    # "lockfile already satisfied".
+    # Re-run the install without --ignore-scripts to build the plain
+    # onlyBuiltDependencies packages (bcrypt/better-sqlite3/sharp/sqlite3/
+    # core-js/esbuild/unrs-resolver). --force is required: a plain
+    # re-install treats the lockfile as already satisfied and skips
+    # everything, since pnpmConfigHook already materialized node_modules
+    # (just without scripts).
     pnpm install --offline --frozen-lockfile --force
+
+    # yencode is the one onlyBuiltDependencies entry that's also a
+    # patched dependency (patchedDependencies), and its build/ directory
+    # never gets created via pnpm's own install/rebuild machinery no
+    # matter how it's invoked or scoped — node-gyp simply never starts
+    # for it. Rather than fight pnpm's allowlist-matching for a patched
+    # package further, build it directly: find wherever pnpm placed it
+    # in the content-addressed store and run its own install script
+    # (node-gyp rebuild) by hand.
+    yencode_dir=$(find node_modules/.pnpm -maxdepth 1 -iname 'yencode@*' -print -quit)
+    if [ -z "$yencode_dir" ]; then
+      echo "ERROR: yencode not found under node_modules/.pnpm" >&2
+      exit 1
+    fi
+    ( cd "$yencode_dir/node_modules/yencode" && node-gyp rebuild )
+    test -f "$yencode_dir/node_modules/yencode/build/Release/yencode.node"
+
     pnpm run metadata
     pnpm build
 
