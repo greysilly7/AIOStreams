@@ -52,7 +52,11 @@ pkgs.stdenv.mkDerivation {
     # pnpmConfigHook already pointed pnpm at pnpmDeps' rehydrated store
     # during configurePhase; --offline here just enforces it stays that
     # way instead of falling back to the network on any miss.
-    pnpm install --offline --frozen-lockfile --ignore-scripts=false
+    # (Scripts run by default in pnpm — no --ignore-scripts flag needed.
+    # A prior `--ignore-scripts=false` here silently disabled every native
+    # build script instead of forcing them on, e.g. yencode's build/Release
+    # never got compiled with zero errors or warnings to show for it.)
+    pnpm install --offline --frozen-lockfile
     pnpm run metadata
     pnpm build
 
