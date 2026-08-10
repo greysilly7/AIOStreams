@@ -67,7 +67,10 @@ pkgs.stdenv.mkDerivation {
     # ordering (server's prepublish ran before core existed to build
     # against). Naming the actual dependencies rebuilds them wherever
     # they sit in the tree without that side effect.
+    echo "=== BEGIN pnpm rebuild ==="
     pnpm rebuild bcrypt better-sqlite3 core-js esbuild sharp sqlite3 unrs-resolver yencode
+    rebuild_exit=$?
+    echo "=== END pnpm rebuild, exit code: $rebuild_exit ==="
     pnpm run metadata
     pnpm build
 
