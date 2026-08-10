@@ -60,17 +60,22 @@ pkgs.stdenv.mkDerivation {
     # skipped, for exactly the onlyBuiltDependencies-allowlisted packages
     # (see pnpm-workspace.yaml). Without this, e.g. yencode's
     # build/Release/yencode.node never gets compiled, with no error.
-    # Named explicitly rather than `pnpm rebuild -r`: `-r` also re-runs
-    # every *workspace package's own* lifecycle scripts recursively
-    # (packages/server's prepublish, packages/docs' postinstall), which
-    # both duplicates the real `pnpm build` below and breaks build
-    # ordering (server's prepublish ran before core existed to build
-    # against). Naming the actual dependencies rebuilds them wherever
-    # they sit in the tree without that side effect.
-    echo "=== BEGIN pnpm rebuild ==="
-    pnpm rebuild bcrypt better-sqlite3 core-js esbuild sharp sqlite3 unrs-resolver yencode
-    rebuild_exit=$?
-    echo "=== END pnpm rebuild, exit code: $rebuild_exit ==="
+    #
+    # `pnpm rebuild <names>` alone is scoped to the CURRENT package only
+    # (same as any other pnpm command) — from the workspace root, none of
+    # these are direct root dependencies, so it silently matches nothing
+    # and exits 0. `-r` (recursive across all workspace members) does
+    # reach them, but also re-runs every workspace package's OWN
+    # lifecycle scripts (packages/server's prepublish, packages/docs'
+    # postinstall) as a side effect, breaking build ordering. Scoping
+    # via --filter to just the two packages that actually declare these
+    # dependencies (core: bcrypt/better-sqlite3/core-js/sharp/sqlite3/
+    # unrs-resolver/yencode; seanime-extensions: esbuild) reaches them
+    # without touching any other workspace member's scripts — neither
+    # of these two packages has an install-family lifecycle script of
+    # its own to worry about.
+    pnpm --filter core --filter seanime-extensions rebuild \
+      bcrypt better-sqlite3 core-js esbuild sharp sqlite3 unrs-resolver yencode
     pnpm run metadata
     pnpm build
 
