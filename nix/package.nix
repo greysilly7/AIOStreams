@@ -7,23 +7,28 @@
 let
   inherit (pkgs) lib;
   nodejs = pkgs.nodejs_24 or pkgs.nodejs;
-  pnpmTool = pkgs.pnpm or pkgs.corepack; # packageManager: pnpm@11 (via corepack if pnpm not packaged)
+  pnpm = pkgs.pnpm_11 or pkgs.pnpm; # packageManager: pnpm@11
 
+  # fetcherVersion 4 dumps the pnpm store as a SQLite SQL file; pnpmConfigHook
+  # (nativeBuildInputs, below) rehydrates it during configurePhase. Without
+  # the hook, pnpm can't see any of these packages as "reused" and silently
+  # falls back to the network for the entire dependency graph.
   pnpmDeps = pkgs.fetchPnpmDeps {
-    inherit src;
-    name = "aiostreams-pnpm-deps";
+    inherit src pnpm;
+    pname = "aiostreams";
+    version = "2.32.1";
+    fetcherVersion = 4;
   };
-
-  builder = with pkgs; stdenv.mkDerivation;
 in
 pkgs.stdenv.mkDerivation {
   pname = "aiostreams";
   version = "2.32.1";
-  inherit src;
+  inherit src pnpmDeps;
 
   nativeBuildInputs = [
     nodejs
-    pnpmTool
+    pnpm
+    pkgs.pnpmConfigHook
     pkgs.python3 # node-gyp (better-sqlite3) compile
     pkgs.gcc13 # C toolchain for native modules
   ];
@@ -34,19 +39,18 @@ pkgs.stdenv.mkDerivation {
     runHook preBuild
 
     export HOME="$PWD"
-    export npm_config_store_dir="$pnpmDeps"
     export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 
     # pnpm self-reconciles against package.json's packageManager pin by
     # querying the npm registry for that exact release, which the offline
-    # build sandbox can't reach. The env-var opt-out
-    # (manage-package-manager-versions) didn't suppress it, so drop the
-    # pin outright — nixpkgs' pnpm (already on PATH via nativeBuildInputs)
-    # is close enough, and this only touches the ephemeral build copy.
+    # build sandbox can't reach. Drop the pin — nixpkgs' pnpm (already on
+    # PATH via nativeBuildInputs) is close enough, and this only touches
+    # the ephemeral build copy.
     sed -i '/"packageManager":/d' package.json
 
-    # offline install against the prefetched pnpm store; native scripts run so
-    # better-sqlite3 compiles its bundled sqlite3.c in the build sandbox
+    # pnpmConfigHook already pointed pnpm at pnpmDeps' rehydrated store
+    # during configurePhase; --offline here just enforces it stays that
+    # way instead of falling back to the network on any miss.
     pnpm install --offline --frozen-lockfile --ignore-scripts=false
     pnpm run metadata
     pnpm build
