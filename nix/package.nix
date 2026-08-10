@@ -49,14 +49,19 @@ pkgs.stdenv.mkDerivation {
     # the ephemeral build copy.
     sed -i '/"packageManager":/d' package.json
 
-    # pnpmConfigHook already pointed pnpm at pnpmDeps' rehydrated store
-    # during configurePhase; --offline here just enforces it stays that
-    # way instead of falling back to the network on any miss.
-    # (Scripts run by default in pnpm — no --ignore-scripts flag needed.
-    # A prior `--ignore-scripts=false` here silently disabled every native
-    # build script instead of forcing them on, e.g. yencode's build/Release
-    # never got compiled with zero errors or warnings to show for it.)
+    # pnpmConfigHook already materialized node_modules from pnpmDeps'
+    # rehydrated store during configurePhase — but it hardcodes
+    # --ignore-scripts on that install by design (a config hook shouldn't
+    # run arbitrary scripts automatically). This re-check is just a fast
+    # no-op against the already-satisfied lockfile.
     pnpm install --offline --frozen-lockfile
+
+    # Explicitly trigger the native builds pnpmConfigHook deliberately
+    # skipped, for exactly the onlyBuiltDependencies-allowlisted packages
+    # (bcrypt, better-sqlite3, sharp, sqlite3, yencode, etc. — see
+    # pnpm-workspace.yaml). Without this, e.g. yencode's
+    # build/Release/yencode.node never gets compiled, with no error.
+    pnpm rebuild
     pnpm run metadata
     pnpm build
 
