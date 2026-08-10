@@ -1,15 +1,15 @@
 packages:
   - packages/*
 
-allowBuilds:
-  bcrypt: true
-  better-sqlite3: true
-  core-js: true
-  esbuild: true
-  sharp: true
-  sqlite3: true
-  unrs-resolver: true
-  yencode: true
+onlyBuiltDependencies:
+  - bcrypt
+  - better-sqlite3
+  - core-js
+  - esbuild
+  - sharp
+  - sqlite3
+  - unrs-resolver
+  - yencode
 
 patchedDependencies:
   stremthru: patches/stremthru.patch
