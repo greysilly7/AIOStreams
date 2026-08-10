@@ -61,7 +61,10 @@ pkgs.stdenv.mkDerivation {
     # (bcrypt, better-sqlite3, sharp, sqlite3, yencode, etc. — see
     # pnpm-workspace.yaml). Without this, e.g. yencode's
     # build/Release/yencode.node never gets compiled, with no error.
-    pnpm rebuild
+    # -r is required: plain `pnpm rebuild` only scopes to the workspace
+    # root, and yencode/better-sqlite3/etc. are packages/core's
+    # dependencies, not the root's — without -r this silently no-ops.
+    pnpm rebuild -r
     pnpm run metadata
     pnpm build
 
