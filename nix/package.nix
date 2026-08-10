@@ -32,6 +32,13 @@ pkgs.stdenv.mkDerivation {
     pkgs.pnpmConfigHook
     pkgs.python3 # node-gyp (better-sqlite3) compile
     pkgs.gcc13 # C toolchain for native modules
+    # yencode bundles crcutil as a C dependency, bootstrapped via
+    # autotools (configure/Makefile.am/autogen.sh) before node-gyp
+    # links against it — none of these were previously available.
+    pkgs.autoconf
+    pkgs.automake
+    pkgs.libtool
+    pkgs.pkg-config
   ];
 
   NODE_OPTIONS = "--max-old-space-size=8192";
