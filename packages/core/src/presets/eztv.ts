@@ -1,12 +1,12 @@
 ﻿import { Option, UserData } from '../db/index.js';
-import { appConfig, constants } from '../utils/index.js';
+import { appConfig, ServiceId, constants } from '../utils/index.js';
 import { StremThruPreset } from './stremthru.js';
 import { TorznabPreset } from './torznab.js';
 
 export class EztvPreset extends TorznabPreset {
   static override get METADATA() {
     const supportedResources = [constants.STREAM_RESOURCE];
-    const supportedServices = [
+    const supportedServices: ServiceId[] = [
       ...StremThruPreset.supportedServices,
       constants.RSDEBRID_SERVICE,
     ];
