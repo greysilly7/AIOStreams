@@ -240,7 +240,11 @@ export class RSDebridService
   public async addNzb(nzbUrl: string, name: string): Promise<DebridDownload> {
     const bytes = await this.fetchBytes(nzbUrl);
     const form = new FormData();
-    form.append('nzb_file', bytes);
+    form.append(
+      'nzb_file',
+      bytes,
+      name.toLowerCase().endsWith('.nzb') ? name : `${name}.nzb`
+    );
     const result = await this.request<{ id?: string }>('POST', '/nzb', {
       body: form,
     });
