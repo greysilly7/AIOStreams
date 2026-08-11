@@ -6,6 +6,10 @@ import { TorznabPreset } from './torznab.js';
 export class KnabenPreset extends TorznabPreset {
   static override get METADATA() {
     const supportedResources = [constants.STREAM_RESOURCE];
+    const supportedServices = [
+      ...StremThruPreset.supportedServices,
+      constants.RSDEBRID_SERVICE,
+    ];
     const options: Option[] = [
       {
         id: 'name',
@@ -38,7 +42,7 @@ export class KnabenPreset extends TorznabPreset {
         type: 'multi-select',
         required: false,
         showInSimpleMode: false,
-        options: StremThruPreset.supportedServices.map((service) => ({
+        options: supportedServices.map((service) => ({
           value: service,
           label: constants.SERVICE_DETAILS[service].name,
         })),
@@ -80,7 +84,7 @@ export class KnabenPreset extends TorznabPreset {
         appConfig.builtins.knaben.defaultTimeout ??
         appConfig.presets.defaultTimeout,
       USER_AGENT: appConfig.http.defaultUserAgent,
-      SUPPORTED_SERVICES: StremThruPreset.supportedServices,
+      SUPPORTED_SERVICES: supportedServices,
       DESCRIPTION:
         'An addon to get debrid results from Knaben, an indexer proxy for several indexers, including The Pirate Bay, 1337x, RARBG, YTS, Nyaa.si and more.',
       OPTIONS: options,

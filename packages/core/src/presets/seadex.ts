@@ -6,6 +6,10 @@ import { TorznabPreset } from './torznab.js';
 export class SeaDexPreset extends TorznabPreset {
   static override get METADATA() {
     const supportedResources = [constants.STREAM_RESOURCE];
+    const supportedServices = [
+      ...StremThruPreset.supportedServices,
+      constants.RSDEBRID_SERVICE,
+    ];
     const options: Option[] = [
       {
         id: 'name',
@@ -36,7 +40,7 @@ export class SeaDexPreset extends TorznabPreset {
         type: 'multi-select',
         required: false,
         showInSimpleMode: false,
-        options: StremThruPreset.supportedServices.map((service) => ({
+        options: supportedServices.map((service) => ({
           value: service,
           label: constants.SERVICE_DETAILS[service].name,
         })),
@@ -63,7 +67,7 @@ export class SeaDexPreset extends TorznabPreset {
       URL: [`${appConfig.bootstrap.internalUrl}/builtins/seadex`],
       TIMEOUT: appConfig.presets.defaultTimeout,
       USER_AGENT: appConfig.http.defaultUserAgent,
-      SUPPORTED_SERVICES: StremThruPreset.supportedServices,
+      SUPPORTED_SERVICES: supportedServices,
       DESCRIPTION:
         'SeaDex is a curated database of the best anime releases. Get high-quality torrents for anime based on community recommendations.',
       OPTIONS: options,

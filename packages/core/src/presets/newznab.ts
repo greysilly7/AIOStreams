@@ -119,6 +119,7 @@ export class NewznabPreset extends BuiltinAddonPreset {
       constants.TORBOX_SERVICE,
       constants.NZBDAV_SERVICE,
       constants.ALTMOUNT_SERVICE,
+      constants.RSDEBRID_SERVICE,
       constants.STREMIO_NNTP_SERVICE,
       constants.STREMTHRU_NEWZ_SERVICE,
       constants.AIOSTREAMS_SERVICE,
