@@ -1,5 +1,38 @@
 # Changelog
 
+## [2.33.2](https://github.com/Viren070/AIOStreams/compare/v2.33.1...v2.33.2) (2026-08-10)
+
+
+### Bug Fixes
+
+* **usenet:** type archive inner files by magic bytes ([9a1b6d7](https://github.com/Viren070/AIOStreams/commit/9a1b6d7f4954dc38113153893c070580ecd1faef))
+* **variants:** support path param based selector and make default ([9778afc](https://github.com/Viren070/AIOStreams/commit/9778afcf07f2b994b226d69031caa454d5127aec))
+
+## [2.33.1](https://github.com/Viren070/AIOStreams/compare/v2.33.0...v2.33.1) (2026-08-09)
+
+
+### Bug Fixes
+
+* **presets/mediafusion:** add torrin as supported service ([#1176](https://github.com/Viren070/AIOStreams/issues/1176)) ([a2231a9](https://github.com/Viren070/AIOStreams/commit/a2231a9ec3687b5af7c10c880b8498267be9ede2))
+
+
+### Miscellaneous Chores
+
+* update header presets ([2e12d3d](https://github.com/Viren070/AIOStreams/commit/2e12d3d3f2d5efcd37208c0e53c871dc7ad1ebbb))
+
+## [2.33.0](https://github.com/Viren070/AIOStreams/compare/v2.32.1...v2.33.0) (2026-08-09)
+
+
+### Features
+
+* add configuration variants with CEL ([b912080](https://github.com/Viren070/AIOStreams/commit/b912080a7ec11fb709c9d4ba3a7b7caa4acc34d4))
+
+
+### Bug Fixes
+
+* **builtins/nab:** apply seasonEpisodeStrategy for indexers without ID support ([#1165](https://github.com/Viren070/AIOStreams/issues/1165)) ([877b6c4](https://github.com/Viren070/AIOStreams/commit/877b6c4ff821fd5865343c821670779c2076e7be))
+* **builtins/nab:** break down ID search support by media type in connection test ([#1166](https://github.com/Viren070/AIOStreams/issues/1166)) ([1ddb54a](https://github.com/Viren070/AIOStreams/commit/1ddb54a1346a21b1da750385461c041cace6846e))
+
 ## [2.32.1](https://github.com/Viren070/AIOStreams/compare/v2.32.0...v2.32.1) (2026-08-05)
 
 

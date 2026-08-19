@@ -541,7 +541,6 @@ export class BaseNabApi<N extends 'torznab' | 'newznab'> {
 
   private getHeaders = (): Record<string, string> => {
     const headers: Record<string, string> = {
-      'Content-Type': 'application/xml',
       Accept: 'application/rss+xml, text/rss+xml, application/xml, text/xml',
       'User-Agent': this.userAgent,
     };

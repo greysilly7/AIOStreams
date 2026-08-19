@@ -10,7 +10,7 @@
 <p align="center">
   <strong>One addon to rule them all.</strong>
   <br />
-  AIOStreams consolidates multiple Stremio addons and debrid/usenet services - including its own suite of built-in addons - into a single, highly customisable super-addon.
+  AIOStreams consolidates multiple Stremio addons and debrid/usenet services - including its own suite of built-in addons and a native Usenet streaming engine - into a single, highly customisable super-addon.
 </p>
 
 <p align="center">

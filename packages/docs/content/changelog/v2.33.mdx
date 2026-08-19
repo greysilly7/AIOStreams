@@ -1,0 +1,148 @@
+---
+title: Variants
+description: One configuration, several addons. A named script adjusts your config at request time, selected by the install URL.
+date: 2026-08-09
+version: 2.33.0
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+{/* Screenshots go in packages/docs/public/changelog/v2.33/ and are linked as ![Alt](/changelog/v2.33/name.png). Only add the link once the file exists: a missing image fails the docs build. */}
+
+Most people end up wanting the same configuration twice. One that skips 4K on the phone,
+one that doesn't on the TV. One with a compact formatter for a client with a narrow list,
+one with the full one everywhere else.
+
+That has been possible for a while: make a second configuration and point it at the first
+as a parent, and it inherits everything except the sections you deliberately override. What
+it costs you is a second configuration to keep track of — its own UUID, its own password,
+its own place in your password manager — for what is often a one-line difference.
+
+**Variants** are the lighter option. A variant is a named set of instructions that adjusts
+your configuration at request time. They live inside the config you already have, and you
+pick one in the install URL, so a single UUID can serve several differently-behaving
+addons.
+
+## Writing one
+
+Variants are under **Miscellaneous → Variants**, in Advanced mode. Give one an id, a name,
+and a script.
+
+![The Variants tab in Miscellaneous, with two variants: 1080p, whose script sets excludedResolutions, and 4K Only, whose script sets requiredResolutions](/changelog/v2.33/variants-menu.png)
+
+The scripts are written in the **[Config Expression Language](/reference/config-expressions)**.
+Where the [Stream Expression Language](/reference/stream-expressions) is evaluated against a
+list of streams, CEL is declarative: one instruction per line, applied to your configuration
+top to bottom. Most variants are a line or two.
+
+```
+set addonName = "AIOStreams (Phone)"
+set excludedResolutions = ["2160p", "1440p"]
+set size.global.movies = [0, 8000000000]
+set resultLimits.global = 10
+```
+
+Beyond `set` there is `merge` for deep-merging an object, `add` / `prepend` / `remove` for
+lists, `unset` and `clear`, `enable` / `disable` as shorthand for an `enabled` flag, and
+`use formatter` / `use variant` to pull in something you have already written. Paths drill
+into the config and can select list entries by property rather than by position, so
+`disable presets[type=torrentio]` disables every Torrentio instance and
+`set services[id=realdebrid].credentials.apiKey = "..."` swaps one account for another. The
+reference has the [full instruction set](/reference/config-expressions#instructions), every
+[path selector](/reference/config-expressions#paths), and
+[recipes](/reference/config-expressions#recipes) for the common cases.
+
+The editor highlights the script, autocompletes field names, real addon instance ids and
+your saved formatter names, and underlines errors as you type. The eye icon previews the
+variant as a **diff against your current configuration**, so you can see exactly which
+fields it changes before saving.
+
+## Installing one
+
+On **Save/Install**, pick a variant and every install link updates. Each variant gets its
+own Stremio addon id, so it installs alongside the base config rather than replacing it.
+
+![The installation card with the 4K Only variant selected, and the shortened alias manifest URL ending in ?v=4k-only](/changelog/v2.33/variants-install.png)
+
+```
+https://your-instance/stremio/<uuid>/<password>/v/4k-only/manifest.json
+```
+
+Comma-separate to combine them, applied left to right so later instructions win. The same
+selector works on ChillLink and Seanime extension URLs; the Search and Newznab/Torznab APIs
+take it as `&v=`.
+
+**Selector location**, on the same card, is the one choice to make. It defaults to the path,
+as above. The alternative appends it as a
+query parameter, which is what the screenshot shows:
+
+```
+https://your-instance/stremio/<uuid>/<password>/manifest.json?v=4k-only
+```
+
+Both are accepted everywhere. Pick whichever form you prefer but know that some clients rebuild request URLs from the base and drop the query string, so
+the variant selector would be lost. The path form survives that, so it is the default. Stremio, Nuvio, the Seanime extensions, the APIs (Search and Newznab/Torznab)
+all support both. Chillio only supports the path form, so if you hand out a Chillio link, use that.
+
+<Callout type="info">
+  The URL in the screenshot is shorter than either — `/stremio/u/main/manifest.json?v=4k-only`
+  — because that configuration has a profile alias. The alias stands in for the UUID and
+  password, and the selector works the same on either form. See an easy way on creating aliases
+  in last release's changelog under [configuration profiles](/changelog/v2.32#configuration-profiles).
+</Callout>
+
+## Things worth knowing
+
+- **The configure page always edits the base config**, even when opened with a variant
+  selected. There is one configuration; variants are a lens over it.
+- **An unknown or disabled id is an error**, surfaced as an error stream, rather than a
+  silent fall back to the base config. Under a variant URL, quietly serving something else
+  is worse than failing.
+- **An instruction that matches nothing is skipped** and only logged. Remove Real-Debrid
+  later and a variant that swapped its credentials keeps working instead of breaking every
+  install URL you handed out. The preview shows these as warnings while you write.
+- **A patched config still goes through ordinary validation**, so a variant cannot produce
+  a configuration you could not have saved by hand, and operator limits still apply.
+- **Variants are not inherited** from a parent config: they reference this config's own
+  addon ids and saved formatter names.
+
+## Variants or a parent config?
+
+Parent configs are not going anywhere, and neither replaces the other.
+
+|                    | Parent/child config                     | Variant                      |
+| ------------------ | --------------------------------------- | ---------------------------- |
+| Configs to set up  | Two, each with its own UUID             | One                          |
+| Written as         | Merge strategies chosen in the UI       | A few lines of CEL           |
+| Seeing the result  | After saving, by looking at the streams | A diff, before you save      |
+| Whose config it is | Theirs, with their own credentials      | Yours, viewed through a lens |
+
+Reach for a variant first. Most differences are one line, you can see the diff before you
+commit to it, and there is no second configuration to create, name and remember.
+
+Sharing is not the dividing line. Hand your config to someone whose TV chokes on Dolby
+Vision and that is still a variant — `add excludedVisualTags "DV Only"`, give them
+`/v/no-dv`, and they get your setup exactly, minus the one thing their hardware cannot do.
+You keep one config, and it stays one config when you change it.
+
+What a variant cannot do is give somebody a configuration of their own. A child config is
+editable by whoever holds it and carries their own debrid credentials, which you never see;
+a variant is a lens over yours, and everything it shows is yours. When the second
+configuration needs to genuinely belong to someone else, that is what parent/child is for.
+
+The other reason to prefer one is taste. Parent configs are point-and-click, at the cost of
+not really being able to tell what a merge will produce until you look at the streams
+coming out of it. Variants ask you to write a little CEL, and show you precisely what
+changed in return.
+
+## For self-hosters
+
+Ten variants per config, four combined per request, 4000 characters each. `VARIANT_ACCESS`
+takes `all` (the default), `trusted` or `none`, and every other limit is tunable too —
+the [full table](/reference/config-expressions#limits) lists each one with its environment
+variable.
+
+<Callout type="info">
+  Full commit-level history for this release is in the [GitHub
+  release](https://github.com/Viren070/AIOStreams/releases/tag/v2.33.0).
+</Callout>
