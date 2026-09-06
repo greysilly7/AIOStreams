@@ -6,7 +6,12 @@
 
 let
   inherit (pkgs) lib;
-  nodejs = pkgs.nodejs_24 or pkgs.nodejs;
+  # Node 24's GC weak-callback path trips an assertion in better-sqlite3's
+  # Statement destructor (`node::RemoveEnvironmentCleanupHook`, `env != nullptr`),
+  # abort()ing the server nondeterministically at runtime. Node 22 lacks that
+  # regression. This binding drives both the native-module compile below and the
+  # runtime wrapper shebang, so build and runtime stay on the same major.
+  nodejs = pkgs.nodejs_22 or pkgs.nodejs;
   pnpm = pkgs.pnpm_11 or pkgs.pnpm; # packageManager: pnpm@11
 
   # fetcherVersion 4 dumps the pnpm store as a SQLite SQL file; pnpmConfigHook
