@@ -57,6 +57,7 @@ import pLimit from 'p-limit';
 import { cleanTitle, normaliseTitle } from '../../parser/utils.js';
 import { NzbDavConfig, NzbDAVService } from '../../debrid/nzbdav.js';
 import { AltmountConfig, AltmountService } from '../../debrid/altmount.js';
+import { RSDebridConfig } from '../../debrid/rsdebrid.js';
 import { formatHours } from '../../formatters/utils.js';
 
 export interface SearchMetadata extends TitleMetadata {
@@ -312,6 +313,7 @@ export abstract class BaseDebridAddon<T extends BaseDebridConfig> {
       [
         'nzbdav',
         'altmount',
+        'rsdebrid',
         'torbox',
         'stremio_nntp',
         'stremthru_newz',
@@ -979,12 +981,16 @@ export abstract class BaseDebridAddon<T extends BaseDebridConfig> {
 
     let nzbdavAuth: z.infer<typeof NzbDavConfig> | undefined;
     let altmountAuth: z.infer<typeof AltmountConfig> | undefined;
+    let rsdebridAuth: z.infer<typeof RSDebridConfig> | undefined;
 
     const encodedNzbdavAuth = this.userData.services.find(
       (s) => s.id === 'nzbdav'
     )?.credential;
     const encodedAltmountAuth = this.userData.services.find(
       (s) => s.id === 'altmount'
+    )?.credential;
+    const encodedRsdebridAuth = this.userData.services.find(
+      (s) => s.id === 'rsdebrid'
     )?.credential;
 
     if (encodedNzbdavAuth) {
@@ -1002,6 +1008,15 @@ export abstract class BaseDebridAddon<T extends BaseDebridConfig> {
       );
       if (success) {
         altmountAuth = data;
+      }
+    }
+
+    if (encodedRsdebridAuth) {
+      const { success, data } = RSDebridConfig.safeParse(
+        JSON.parse(fromUrlSafeBase64(encodedRsdebridAuth))
+      );
+      if (success) {
+        rsdebridAuth = data;
       }
     }
 
@@ -1050,6 +1065,12 @@ export abstract class BaseDebridAddon<T extends BaseDebridConfig> {
 
     if (altmountAuth && !altmountAuth.aiostreamsAuth) {
       setProxyHeaders('altmount', altmountBasicAuth);
+    }
+
+    // RSDebrid: stamp the Bearer token as a proxy header when the instance is
+    // api_key-protected and won't proxy itself (aiostreamsAuth unset).
+    if (rsdebridAuth?.apiKey && !rsdebridAuth?.aiostreamsAuth) {
+      setProxyHeaders('rsdebrid', `Bearer ${rsdebridAuth.apiKey}`);
     }
 
     return {

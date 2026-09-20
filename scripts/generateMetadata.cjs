@@ -24,18 +24,25 @@ const os = require('os');
 let tag;
 if (isDev && refArg) {
   tag = refArg;
-} else if (isNightly) {
-  tag = execSync('git describe --tags --abbrev=0').toString().trim();
 } else {
-  if (os.platform() === 'win32') {
-    tag = execSync('git tag --sort=-version:refname')
-      .toString()
-      .trim()
-      .split('\n')[0];
-  } else {
-    tag = execSync('git tag --sort=-version:refname | head -n 1')
-      .toString()
-      .trim();
+  try {
+    if (isNightly) {
+      tag = execSync('git describe --tags --abbrev=0').toString().trim();
+    } else if (os.platform() === 'win32') {
+      tag = execSync('git tag --sort=-version:refname')
+        .toString()
+        .trim()
+        .split('\n')[0];
+    } else {
+      tag = execSync('git tag --sort=-version:refname | head -n 1')
+        .toString()
+        .trim();
+    }
+  } catch {
+    // No git binary/repo available (e.g. a Nix build sandbox, which
+    // deliberately strips .git for reproducibility) — fall back to the
+    // version already recorded in package.json.
+    tag = `v${version}`;
   }
 }
 
@@ -51,9 +58,13 @@ if (commitArg) {
     commitHash = 'unknown';
   }
 }
-const commitTime = execSync('git log -1 --format=%cd --date=iso')
-  .toString()
-  .trim();
+let commitTime;
+try {
+  commitTime = execSync('git log -1 --format=%cd --date=iso').toString().trim();
+} catch {
+  // Same git-less-sandbox case as the tag fallback above.
+  commitTime = new Date().toISOString();
+}
 
 // Create the version info object
 const versionInfo = {
