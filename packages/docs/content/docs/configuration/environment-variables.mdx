@@ -718,11 +718,11 @@ neither the environment variable nor a stored value is present.
 
 #### Webstreamr
 
-| Environment Variable            | UI Setting                      | Type   | Default                          | Description                                                                                           |
-| ------------------------------- | ------------------------------- | ------ | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `WEBSTREAMR_URL`                | Webstreamr › URL                | list   | `["https://webstreamr.hayd.uk"]` | Upstream URL(s) for the WebStreamr addon.                                                             |
-| `DEFAULT_WEBSTREAMR_TIMEOUT`    | Webstreamr › Default Timeout    | number | —                                | Default timeout for the WebStreamr addon (milliseconds). Falls back to the global default when unset. |
-| `DEFAULT_WEBSTREAMR_USER_AGENT` | Webstreamr › Default User Agent | string | —                                | Default User-Agent for the WebStreamr addon. Supports `{version}`/`{random}` placeholders.            |
+| Environment Variable            | UI Setting                      | Type   | Default                                                   | Description                                                                                           |
+| ------------------------------- | ------------------------------- | ------ | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `WEBSTREAMR_URL`                | Webstreamr › URL                | list   | `["https://87d6a6ef6b58-webstreamrmbg.baby-beamup.club"]` | Upstream URL(s) for the WebStreamr addon.                                                             |
+| `DEFAULT_WEBSTREAMR_TIMEOUT`    | Webstreamr › Default Timeout    | number | —                                                         | Default timeout for the WebStreamr addon (milliseconds). Falls back to the global default when unset. |
+| `DEFAULT_WEBSTREAMR_USER_AGENT` | Webstreamr › Default User Agent | string | —                                                         | Default User-Agent for the WebStreamr addon. Supports `{version}`/`{random}` placeholders.            |
 
 #### Hdhub
 
@@ -1189,7 +1189,7 @@ neither the environment variable nor a stored value is present.
 | ------------------------------- | ----------------------------- | ------ | ------- | ----------------------------------------------------------------------------------------------------- |
 | `MAX_ADDONS`                    | Max Addons                    | number | `15`    | Maximum number of addons a user configuration can install.                                            |
 | `MAX_KEYWORD_FILTERS`           | Max Keyword Filters           | number | `30`    | Maximum number of keyword filters per keyword filter group.                                           |
-| `MAX_FORMATTER_TEMPLATE_LENGTH` | Max Formatter Template Length | number | `5000`  | Maximum length (characters) of a single formatter template string. Enforced during config validation. |
+| `MAX_FORMATTER_TEMPLATE_LENGTH` | Max Formatter Template Length | number | `15000` | Maximum length (characters) of a single formatter template string. Enforced during config validation. |
 | `MAX_FAILOVER_ATTEMPTS`         | Max Failover Attempts         | number | `5`     | Maximum total failover attempts (after de-duplication) a user can configure.                          |
 | `MAX_PARALLEL_ATTEMPTS`         | Max Parallel Attempts         | number | `2`     | Maximum concurrent failover attempts a user can configure. Caps load on upstream providers.           |
 | `MAX_GROUPS`                    | Max Groups                    | number | `20`    | Maximum number of stream groups in a user configuration.                                              |
@@ -1224,18 +1224,16 @@ neither the environment variable nor a stored value is present.
 
 #### Variants
 
-| Environment Variable                  | UI Setting                             | Type   | Default | Description                                                                                                         |
-| ------------------------------------- | -------------------------------------- | ------ | ------- | ------------------------------------------------------------------------------------------------------------------- |
-| `VARIANT_ACCESS`                      | Variants › Access                      | enum   | `all`   | Who may define config variants. "all" = everyone, "trusted" = trusted users only, "none" = the feature is disabled. |
-| `MAX_VARIANTS`                        | Variants › Max                         | number | `10`    | Maximum number of config variants a user may define.                                                                |
-| `MAX_VARIANT_SCRIPT_LENGTH`           | Variants › Max Script Length           | number | `4000`  | Maximum length (characters) of a single variant script. Enforced during config validation.                          |
-| `MAX_VARIANT_TOTAL_SCRIPT_CHARACTERS` | Variants › Max Total Script Characters | number | `20000` | Maximum total character count across every variant script in a configuration.                                       |
-| `MAX_VARIANT_INSTRUCTIONS`            | Variants › Max Instructions            | number | `100`   | Maximum number of instructions in a single variant script.                                                          |
-| `MAX_ACTIVE_VARIANTS`                 | Variants › Max Active                  | number | `4`     | Maximum number of variants that may be combined on a single request.                                                |
-| `MAX_VARIANT_DEPTH`                   | Variants › Max Depth                   | number | `5`     | Maximum depth a variant may nest others through "use variant".                                                      |
-| `MAX_VARIANT_PATH_MATCHES`            | Variants › Max Path Matches            | number | `200`   | Maximum number of places a single variant instruction may write to.                                                 |
-| `MAX_VARIANT_VALUE_DEPTH`             | Variants › Max Value Depth             | number | `10`    | Maximum nesting depth of an object or array literal in a variant script.                                            |
-| `MAX_VARIANT_PATH_SEGMENTS`           | Variants › Max Path Segments           | number | `12`    | Maximum number of segments in a single variant instruction path.                                                    |
+| Environment Variable                  | UI Setting                             | Type   | Default | Description                                                                                                                                                  |
+| ------------------------------------- | -------------------------------------- | ------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `VARIANT_ACCESS`                      | Variants › Access                      | enum   | `all`   | Who may define config variants. "all" = everyone, "trusted" = trusted users only, "none" = the feature is disabled.                                          |
+| `MAX_VARIANTS`                        | Variants › Max                         | number | `10`    | Maximum number of config variants a user may define.                                                                                                         |
+| `MAX_VARIANT_SCRIPT_LENGTH`           | Variants › Max Script Length           | number | `4000`  | Maximum length (characters) of a single variant script. Enforced during config validation.                                                                   |
+| `MAX_VARIANT_TOTAL_SCRIPT_CHARACTERS` | Variants › Max Total Script Characters | number | `20000` | Maximum total character count across every variant script in a configuration.                                                                                |
+| `MAX_VARIANT_TOTAL_INSTRUCTIONS`      | Variants › Max Total Instructions      | number | `5000`  | Maximum number of instructions all the variants on one request may run in total, including those reached through "use variant". Anything past it is skipped. |
+| `MAX_VARIANT_PATH_MATCHES`            | Variants › Max Path Matches            | number | `200`   | Maximum number of places a single variant instruction may write to.                                                                                          |
+| `MAX_VARIANT_VALUE_DEPTH`             | Variants › Max Value Depth             | number | `10`    | Maximum nesting depth of an object or array literal in a variant script.                                                                                     |
+| `MAX_VARIANT_PATH_SEGMENTS`           | Variants › Max Path Segments           | number | `12`    | Maximum number of segments in a single variant instruction path.                                                                                             |
 
 #### Health Checks
 
