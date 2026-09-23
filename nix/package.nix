@@ -26,7 +26,7 @@ let
     pname = "aiostreams";
     version = "2.32.1";
     fetcherVersion = 4;
-    hash = "sha256-2yUusJ6nt6wX7Ax10Ekyc47T+B3Dcq2dfE5stj3ypBA=";
+    hash = "sha256-fj6MfbzNRq0WoG3ArFIUp376Brmtzru765/j7NOxfW4=";
   };
 in
 pkgs.stdenv.mkDerivation {
