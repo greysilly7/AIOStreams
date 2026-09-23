@@ -100,6 +100,7 @@ export class LocalWatchStateProvider implements WatchStateProvider {
       }
       case 'start': {
         this.pending.delete(key);
+        await this.undropOnPlay(scope, event.identity);
         return this.write(scope, event.identity, {
           positionMs: event.positionMs,
           durationMs: event.durationMs,
@@ -141,7 +142,41 @@ export class LocalWatchStateProvider implements WatchStateProvider {
           favorite: false,
           snapshot: event.snapshot,
         });
+      case 'dropped':
+      case 'undropped':
+        return this.write(scope, event.identity, {
+          dropped: event.type === 'dropped',
+          snapshot: event.snapshot,
+        });
     }
+  }
+
+  private async undropOnPlay(scope: WatchScope, identity: WatchIdentity) {
+    if (identity.kind === 'episode' && identity.seriesKey)
+      await WatchStateRepository.undropSeries(scope, identity.seriesKey);
+  }
+
+  async clear(scope: WatchScope, itemKeys?: string[]): Promise<number> {
+    const prefix = `${scope.uuid}|${scope.persona}|`;
+    const only = itemKeys ? new Set(itemKeys) : null;
+    for (const key of this.pending.keys()) {
+      if (!key.startsWith(prefix)) continue;
+      if (!only || only.has(key.slice(prefix.length))) this.pending.delete(key);
+    }
+    const cleared = await WatchStateRepository.clearPlayback(scope, itemKeys);
+    if (cleared.length) {
+      this.notify(
+        scope,
+        cleared.map((row) => ({
+          ...row,
+          played: false,
+          positionMs: 0,
+          playCount: 0,
+          lastPlayedAt: null,
+        }))
+      );
+    }
+    return cleared.length;
   }
 
   async flush(): Promise<void> {
@@ -239,9 +274,14 @@ export class LocalWatchStateProvider implements WatchStateProvider {
     patch: WatchStatePatch
   ): Promise<WatchStateRow> {
     const row = await WatchStateRepository.upsert(scope, identity, patch);
+    this.notify(scope, [row]);
+    return row;
+  }
+
+  private notify(scope: WatchScope, rows: WatchStateRow[]) {
     for (const listener of this.listeners) {
       try {
-        listener(scope, [row]);
+        listener(scope, rows);
       } catch (error) {
         logger.debug(
           { err: error instanceof Error ? error.message : String(error) },
@@ -249,6 +289,5 @@ export class LocalWatchStateProvider implements WatchStateProvider {
         );
       }
     }
-    return row;
   }
 }

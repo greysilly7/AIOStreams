@@ -191,6 +191,39 @@ export function sourceRecordFrom(
   };
 }
 
+export function noticeRecordFrom(
+  uuid: string,
+  identity: string,
+  label: string,
+  extension: Pick<
+    AiostreamsSourceExtension,
+    'name' | 'description' | 'addon' | 'type'
+  >
+): MediaSourceRecord {
+  return {
+    msid: mediaSourceId(uuid, identity),
+    url: '',
+    container: 'mp4',
+    label,
+    subtitles: [],
+    live: false,
+    notice: true,
+    extension: {
+      ...extension,
+      visualTags: [],
+      audioTags: [],
+      audioChannels: [],
+      languages: [],
+    },
+  };
+}
+
+export function playableSources(
+  sources: MediaSourceRecord[]
+): MediaSourceRecord[] {
+  return sources.filter((source) => !source.notice);
+}
+
 const STREAM_FLAGS = {
   IsForced: false,
   IsExternal: false,
@@ -366,9 +399,13 @@ export interface MediaSourceBuildOptions {
   subtitleFormat: (sourceExtension: string) => SubtitleFormat;
   /** Server-relative delivery URL for the subtitle stream at `index`. */
   subtitleUrl: (index: number, format: SubtitleFormat) => string;
+  /** `File` sends the client through the server's stream route, not `Path`. */
+  protocol?: 'Http' | 'File';
   runtimeMs?: number;
   includeExtension: boolean;
   hasSegments?: boolean;
+  /** Where a notice source points, having nothing of its own. */
+  noticePath?: string;
 }
 
 /**
@@ -447,13 +484,22 @@ export function buildMediaSource(
   record: MediaSourceRecord,
   opts: MediaSourceBuildOptions
 ): JellyfinMediaSource {
+  if (record.notice) {
+    const notice = placeholderMediaSource(
+      opts.id,
+      record.label,
+      opts.noticePath ?? ''
+    );
+    if (opts.includeExtension) notice.aiostreams = record.extension;
+    return notice;
+  }
   const mediaStreams = buildMediaStreams(record, opts);
   const audioIndex = mediaStreams.findIndex((s) => s.Type === 'Audio');
   const durationMs = record.live
     ? undefined
     : record.durationMs || opts.runtimeMs;
   const source: JellyfinMediaSource = {
-    Protocol: 'Http',
+    Protocol: opts.protocol ?? 'Http',
     Id: opts.id,
     Path: record.url,
     Type: 'Default',

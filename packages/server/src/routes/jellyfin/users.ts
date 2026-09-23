@@ -1,9 +1,7 @@
 import { createHash } from 'crypto';
 import { Router, type Request } from 'express';
 import {
-  Cache,
   createLogger,
-  descriptorForWatchRow,
   encryptString,
   getSimpleTextHash,
   isConfigUuid,
@@ -13,11 +11,9 @@ import {
   resolveConfigAlias,
   serverId as instanceServerId,
   sessionKeyFor,
-  stripInternal,
   TICKS_PER_MS,
   WatchSessionRepository,
   type ClientInfo,
-  type JellyfinItem,
   type JellyfinPersona,
   type UserData,
   type WatchSessionRow,
@@ -28,12 +24,16 @@ import {
   param,
   personaById,
   personaByName,
+  accountLocked,
+  PIN_REQUIRED,
+  personaLocked,
+  userUnlocks,
   personasOf,
   qs,
   resolveConfig,
   type JellyfinRequestContext,
 } from './context.js';
-import { itemFromDescriptor } from './items.js';
+import { summaryItem } from './items.js';
 import { serverName } from './system.js';
 
 const logger = createLogger('jellyfin');
@@ -111,7 +111,7 @@ export function userPolicy(opts: { admin?: boolean; hidden?: boolean } = {}) {
 type Faced = Pick<UserData, 'addonName' | 'jellyfin'>;
 
 /** The primary user's name, which stood in for a configuration before it had one. */
-function accountName(userData: Faced): string {
+export function accountName(userData: Faced): string {
   return userData.jellyfin?.primary?.name || userData.addonName || serverName();
 }
 
@@ -132,6 +132,7 @@ export function userDto(
   opts: { pickable?: boolean; forKey?: boolean } = {}
 ) {
   const pickable = opts.pickable ?? false;
+  const locked = persona ? personaLocked(persona) : accountLocked(userData);
   const now = new Date().toISOString();
   const tag = avatarTag(
     persona ? persona.avatar : userData.jellyfin?.primary?.avatar
@@ -142,10 +143,10 @@ export function userDto(
     ServerName: serverName(),
     Id: personaUserId(uuid, persona?.id ?? ''),
     ...(tag ? { PrimaryImageTag: tag } : {}),
-    HasPassword: !pickable,
-    HasConfiguredPassword: !pickable,
+    HasPassword: !pickable || locked,
+    HasConfiguredPassword: !pickable || locked,
     HasConfiguredEasyPassword: false,
-    EnableAutoLogin: true,
+    EnableAutoLogin: !locked,
     LastLoginDate: now,
     LastActivityDate: now,
     Configuration: userConfiguration(),
@@ -217,12 +218,13 @@ function clientOf(req: Request): ClientInfo {
   );
 }
 
-async function authenticationResult(
+export async function authenticationResult(
   req: Request,
   uuid: string,
   encryptedPassword: string,
   userData: UserData,
-  persona: JellyfinPersona | null
+  persona: JellyfinPersona | null,
+  opts: { openedAsAccount?: boolean } = {}
 ) {
   const client = clientOf(req);
   return {
@@ -233,13 +235,14 @@ async function authenticationResult(
       p: encryptedPassword,
       d: client.deviceId,
       k: persona?.id,
+      ...(persona && opts.openedAsAccount ? { o: 1 as const } : {}),
     }),
     ServerId: instanceServerId(),
   };
 }
 
 /** Every user of one configuration, the account first. */
-function allUsers(
+export function allUsers(
   uuid: string,
   userData: UserData,
   opts: { pickable?: boolean; forKey?: boolean } = {}
@@ -247,7 +250,7 @@ function allUsers(
   return [
     userDto(uuid, userData, null, opts),
     ...personasOf(userData)
-      .filter((p) => opts.forKey || !p.hidden)
+      .filter((p) => (opts.forKey ? !personaLocked(p) : !p.hidden))
       .map((p) => userDto(uuid, userData, p, opts)),
   ];
 }
@@ -295,6 +298,9 @@ router.post(
     let uuid: string | undefined;
     let encryptedPassword: string | undefined;
     let personaName: string;
+    // A PIN: all of `Pw` where the configuration is already proven, the part
+    // after the password on the bare mount.
+    let pin = pw;
     if (ctx?.preAuthenticated) {
       uuid = ctx.uuid;
       encryptedPassword = ctx.encryptedPassword;
@@ -311,13 +317,29 @@ router.post(
         return;
       }
       if (isConfigUuid(account)) {
-        const enc = encryptString(pw);
-        if (!enc.success || !enc.data) {
-          res.status(500).json({ Message: 'Encryption failure' });
+        uuid = account;
+        // `<password>/<pin>`. The whole value is tried as the password first,
+        // so a password that itself holds a slash still signs in.
+        const slash = pw.lastIndexOf('/');
+        const candidates: [string, string][] = [[pw, '']];
+        if (slash > 0)
+          candidates.push([pw.slice(0, slash), pw.slice(slash + 1)]);
+        for (const [password, rest] of candidates) {
+          const enc = encryptString(password);
+          if (!enc.success || !enc.data) {
+            res.status(500).json({ Message: 'Encryption failure' });
+            return;
+          }
+          if (await resolveConfig(uuid, enc.data)) {
+            encryptedPassword = enc.data;
+            pin = rest;
+            break;
+          }
+        }
+        if (!encryptedPassword) {
+          res.status(401).json({ Message: 'Invalid username or password' });
           return;
         }
-        uuid = account;
-        encryptedPassword = enc.data;
       } else {
         // an alias already carries its password, the way alias URLs do
         const alias = await resolveConfigAlias(account);
@@ -340,6 +362,10 @@ router.post(
       res.status(401).json({ Message: 'Invalid username or password' });
       return;
     }
+    if (!(await userUnlocks(uuid, userData, signIn.persona, pin))) {
+      res.status(401).json({ Message: PIN_REQUIRED });
+      return;
+    }
     const client = clientOf(req);
     logger.info(
       {
@@ -356,7 +382,8 @@ router.post(
         uuid,
         encryptedPassword,
         userData,
-        signIn.persona
+        signIn.persona,
+        { openedAsAccount: !accountLocked(userData) }
       )
     );
   })
@@ -464,47 +491,9 @@ router.post(
 );
 
 const SESSIONS_LIMIT = 50;
-const NOW_PLAYING_TTL = 600;
-const NOW_PLAYING_MISS_TTL = 30;
-const NOW_PLAYING_OMIT = [
-  'MediaSources',
-  'MediaStreams',
-  'People',
-  'Tags',
-  'RemoteTrailers',
-  'UserData',
-];
-
-const nowPlayingCache = Cache.getInstance<
-  string,
-  JellyfinItem | { missing: true }
->('jellyfin-now-playing', 5_000, 'memory');
-
-async function nowPlayingItem(
-  ctx: JellyfinRequestContext,
-  row: WatchSessionRow
-): Promise<JellyfinItem | null> {
-  const key = `${ctx.userId}|${ctx.scope()}|${row.itemKey}|${row.durationMs}`;
-  const hit = await nowPlayingCache.get(key);
-  if (hit) return 'missing' in hit ? null : hit;
-
-  const built = await itemFromDescriptor(ctx, descriptorForWatchRow(row)).catch(
-    () => null
-  );
-  if (!built) {
-    await nowPlayingCache.set(key, { missing: true }, NOW_PLAYING_MISS_TTL);
-    return null;
-  }
-  const item = stripInternal(built) as JellyfinItem & Record<string, unknown>;
-  for (const field of NOW_PLAYING_OMIT) delete item[field];
-  if (row.durationMs > 0)
-    item.RunTimeTicks = Math.round(row.durationMs) * TICKS_PER_MS;
-  await nowPlayingCache.set(key, item, NOW_PLAYING_TTL);
-  return item;
-}
 
 /** The caller's own session is the one this request is from, so it is active now. */
-async function sessionFromRow(
+export async function sessionFromRow(
   ctx: JellyfinRequestContext,
   row: WatchSessionRow,
   user: JellyfinPersona | null,
@@ -527,7 +516,7 @@ async function sessionFromRow(
   );
   const checkIn = new Date(row.lastCheckinAt).toISOString();
   const playing = row.endedAt == null;
-  const item = playing ? await nowPlayingItem(ctx, row) : null;
+  const item = playing ? await summaryItem(ctx, row) : null;
   return {
     ...session,
     LastActivityDate: own ? session.LastActivityDate : checkIn,

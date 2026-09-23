@@ -129,6 +129,16 @@ const arrayModifiers = {
   rsort: sortBy(false),
   lsort: (value: any[]) => [...value].sort(),
   reverse: (value: string[]) => [...value].reverse(),
+  // ignores case, like the other list comparisons; the first spelling wins
+  unique: (value: string[]) => {
+    const seen = new Set<string>();
+    return value.filter((item) => {
+      const key = String(item).toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  },
   languagecode: (value: string[]) => mapLanguages(value, toLanguageCode),
   languageemoji: (value: string[]) => mapLanguages(value, toLanguageEmoji),
   string: (value: string[]) => value.toString(),
@@ -323,6 +333,24 @@ function replaceAll(
   return out.length > MAX_RENDER_LENGTH ? out.slice(0, MAX_RENDER_LENGTH) : out;
 }
 
+type Replaceable = string | unknown[];
+
+const isReplaceable = (value: unknown): value is Replaceable =>
+  typeof value === 'string' || (Array.isArray(value) && !isObjectList(value));
+
+/** A list matches whole elements, ignoring case, as `keep` and `remove` do. */
+function replaceIn(
+  value: Replaceable,
+  search: string,
+  replacement: string
+): Replaceable {
+  if (typeof value === 'string') return replaceAll(value, search, replacement);
+  const target = search.toLowerCase();
+  return value.map((item) =>
+    String(item).toLowerCase() === target ? replacement : item
+  );
+}
+
 /**
  * Returns `undefined` when the modifier does not apply to the value's runtime
  * type; the caller turns that into the right error message.
@@ -404,11 +432,9 @@ function compileParameterised(
         const [, variablePath, , rawReplacement] = variableForm;
         const replacementText = substituteTools(rawReplacement);
         return (value, parseValue, ctx) => {
-          if (typeof value !== 'string') return undefined;
+          if (!isReplaceable(value)) return undefined;
           const resolved = ctx.resolveVariable(variablePath, parseValue);
-          return resolved
-            ? replaceAll(value, resolved, replacementText)
-            : value;
+          return resolved ? replaceIn(value, resolved, replacementText) : value;
         };
       }
 
@@ -421,7 +447,7 @@ function compileParameterised(
 
       // an empty search would match between every character
       if (extra !== undefined || !rawSearch || replacement === undefined) {
-        return (value) => (typeof value === 'string' ? value : undefined);
+        return (value) => (isReplaceable(value) ? value : undefined);
       }
 
       const variableKey =
@@ -432,12 +458,12 @@ function compileParameterised(
       const replacementText = substituteTools(replacement);
 
       return (value, parseValue, ctx) => {
-        if (typeof value !== 'string') return undefined;
-        if (!variableKey) return replaceAll(value, rawSearch, replacementText);
+        if (!isReplaceable(value)) return undefined;
+        if (!variableKey) return replaceIn(value, rawSearch, replacementText);
 
         const resolved = ctx.resolveVariable(variableKey, parseValue);
         if (!resolved) return value;
-        return replaceAll(value, resolved, replacementText);
+        return replaceIn(value, resolved, replacementText);
       };
     }
 

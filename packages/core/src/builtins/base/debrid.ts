@@ -423,6 +423,8 @@ export abstract class BaseDebridAddon<T extends BaseDebridConfig> {
       episode: searchMetadata.episode,
       absoluteEpisode: searchMetadata.absoluteEpisode,
       relativeAbsoluteEpisode: searchMetadata.relativeAbsoluteEpisode,
+      tvdbSeason: searchMetadata.tvdbSeason,
+      tvdbEpisode: searchMetadata.tvdbEpisode,
       airDates: searchMetadata.airDates,
       isDateBased: searchMetadata.isDateBased,
     };
@@ -835,6 +837,8 @@ export abstract class BaseDebridAddon<T extends BaseDebridConfig> {
       airDates: metadata.episodeAirDates,
       episodeAirDate: metadata.episodeAirDate,
       resolvedSeasonFirstEpisode: metadata.resolvedSeasonFirstEpisode,
+      tvdbSeason: metadata.tvdbSeason,
+      tvdbEpisode: metadata.tvdbEpisode,
       sceneTitles: metadata.sceneTitles,
       country: metadata.country,
       titleConflicts: metadata.titleConflicts,

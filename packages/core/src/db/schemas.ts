@@ -111,6 +111,23 @@ const Formatter = z.object({
 const CONFIG_UUID_SHAPE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export const PERSONA_PIN_PATTERN = /^\d{4,12}$/;
+const BCRYPT_HASH_PATTERN = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
+/** A plain PIN as entered, or the bcrypt hash it was saved as. */
+const PERSONA_LOCK_PATTERN = new RegExp(
+  `${PERSONA_PIN_PATTERN.source}|${BCRYPT_HASH_PATTERN.source}`
+);
+
+export function isPersonaLockHash(value: string): boolean {
+  return BCRYPT_HASH_PATTERN.test(value);
+}
+
+/** A PIN's bcrypt hash; a plain PIN sent here is hashed when the config is saved. */
+const UserLockSchema = z
+  .string()
+  .regex(PERSONA_LOCK_PATTERN, 'A PIN must be 4 to 12 digits.')
+  .optional();
+
 /** A user a Jellyfin client can sign in as. Shares the configuration's credential. */
 const JellyfinPersonaSchema = z.object({
   // Names the DB partition, so a rename must not touch it.
@@ -130,6 +147,7 @@ const JellyfinPersonaSchema = z.object({
   trackers: z.array(z.string().min(1)).max(50).optional(),
   /** Kept out of the picker; still usable by name. */
   hidden: z.boolean().optional(),
+  lock: UserLockSchema,
 });
 
 export type JellyfinPersona = z.infer<typeof JellyfinPersonaSchema>;
@@ -165,6 +183,7 @@ const JellyfinSettingsFields = z.object({
         .optional(),
       /** Preset ids of the trackers it syncs with; absent means all. */
       trackers: z.array(z.string().min(1)).max(50).optional(),
+      lock: UserLockSchema,
     })
     .optional(),
   personas: z
@@ -1171,6 +1190,11 @@ export const UserDataSchema = z.object({
     })
     .optional(),
   jellyfin: JellyfinSettings.optional(),
+  remuxDb: z
+    .object({
+      enabled: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 export type UserData = z.infer<typeof UserDataSchema>;
@@ -1267,6 +1291,7 @@ export const ManifestSchema = z
         p2p: z.boolean().optional(),
         configurable: z.boolean().optional(),
         configurationRequired: z.boolean().optional(),
+        epgProvider: z.boolean().optional(),
       })
       .optional(),
     // not part of the manifest scheme, but needed for stremio-addons.net
@@ -1561,6 +1586,15 @@ const MetaLinkSchema = z
   })
   .passthrough();
 
+/** A certification a programme carries. */
+const ContentRatingSchema = z
+  .object({
+    value: z.string(),
+    system: z.string().nullish(),
+    icon: z.string().nullish(),
+  })
+  .passthrough();
+
 const ExternalIdsSchema = z.record(
   z.string(),
   z.string().or(z.number()).nullable()
@@ -1638,6 +1672,15 @@ const MetaVideoSchema = z
     ids: ExternalIdsSchema.nullish(),
     rating: z.number().or(z.string()).nullish(),
     people: z.array(MetaPersonSchema).nullish(),
+    startTime: z.string().nullish(),
+    endTime: z.string().nullish(),
+    runtime: z.string().nullish(),
+    releaseInfo: z.string().nullish(),
+    genres: z.array(z.string()).nullish(),
+    cast: z.array(z.string()).nullish(),
+    directors: z.array(z.string()).nullish(),
+    links: z.array(MetaLinkSchema).nullish(),
+    ratings: z.array(ContentRatingSchema).nullish(),
   })
   .passthrough();
 
@@ -1689,6 +1732,7 @@ export const MetaSchema = MetaPreviewSchema.extend({
     .object({
       defaultVideoId: z.string().or(z.null()).optional(),
       hasScheduledVideo: z.boolean().nullable().optional(),
+      hasScheduledVideos: z.boolean().nullable().optional(),
     })
     .passthrough()
     .optional(),
@@ -1728,6 +1772,7 @@ export const ExtrasSchema = z
     skip: z.coerce.number().optional(),
     genre: z.string().optional(),
     search: z.string().optional(),
+    date: z.string().optional(),
     filename: z.string().optional(),
     videoHash: z.string().optional(),
     videoSize: z.coerce.number().optional(),
@@ -1929,6 +1974,7 @@ const StatusResponseSchema = z.object({
       tmdb: z.object({ accessToken: z.boolean(), apiKey: z.boolean() }),
       tvdb: z.object({ apiKey: z.boolean() }),
     }),
+    remuxdb: z.object({ enabled: z.boolean() }),
     /** Global analytics master switch (false = no events written anywhere). */
     analyticsEnabled: z.boolean(),
     /** Per-user analytics (configure-page Stats tab) enabled state. */

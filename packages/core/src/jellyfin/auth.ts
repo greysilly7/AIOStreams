@@ -15,6 +15,8 @@ export interface TokenPayload {
   k?: string;
   /** API key id; the token then acts for every user. */
   a?: string;
+  /** Set when the credential that began the session also opens the account. */
+  o?: 1;
   iat: number;
 }
 
@@ -47,9 +49,10 @@ export function serverId(): string {
   ).slice(0, 32);
 }
 
+/** Form-decoded: a client may send spaces as `+`. */
 function decodeValue(v: string): string {
   try {
-    return decodeURIComponent(v);
+    return decodeURIComponent(v.replace(/\+/g, ' '));
   } catch {
     return v;
   }

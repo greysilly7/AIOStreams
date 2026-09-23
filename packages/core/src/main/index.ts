@@ -32,6 +32,7 @@ import { getCatalog as _getCatalog } from './catalog.js';
 import {
   getStreams as _getStreams,
   getMeta as _getMeta,
+  getMetaCandidates,
   getSubtitles as _getSubtitles,
   getAddonCatalog as _getAddonCatalog,
 } from './resources.js';
@@ -118,9 +119,19 @@ export class AIOStreams {
     return this.ctx.streamContext;
   }
 
+  public getUserData(): UserData {
+    return this.ctx.userData;
+  }
+
   public getResources(): StrictManifestResource[] {
     this.checkInitialised();
     return this.ctx.finalResources;
+  }
+
+  /** Whether any addon in this configuration could answer a meta request. */
+  public canGetMeta(type: string, id: string): boolean {
+    this.checkInitialised();
+    return getMetaCandidates(this.ctx, type, id).length > 0;
   }
 
   public getCatalogs(): Manifest['catalogs'] {

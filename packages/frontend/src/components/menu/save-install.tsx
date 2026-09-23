@@ -22,6 +22,7 @@ import {
   Code2,
   CopyIcon,
   KeyRound,
+  MonitorPlay,
   Layers,
   LibraryBig,
   Settings2,
@@ -1636,6 +1637,7 @@ function Content() {
   const [lookingUpQuickConnect, setLookingUpQuickConnect] =
     React.useState(false);
   const [quickConnectPersona, setQuickConnectPersona] = React.useState('');
+  const [quickConnectPin, setQuickConnectPin] = React.useState('');
   const [approvingQuickConnect, setApprovingQuickConnect] =
     React.useState(false);
   const aniyomiModal = useDisclosure(false);
@@ -1864,6 +1866,9 @@ function Content() {
     ? (jellyfinPersonas.find((p) => p.id === quickConnectPersona)?.name ??
       quickConnectPersona)
     : null;
+  const quickConnectLocked = quickConnectPersona
+    ? !!jellyfinPersonas.find((p) => p.id === quickConnectPersona)?.lock
+    : !!userData.jellyfin?.primary?.lock;
   // Carries the password, so the picker can list users before sign-in.
   const jellyfinPickerUrl =
     uuid && encryptedPassword
@@ -1927,6 +1932,7 @@ function Content() {
     setQuickConnectCode('');
     setQuickConnectPending(null);
     setQuickConnectPersona('');
+    setQuickConnectPin('');
   };
 
   const approveQuickConnect = async () => {
@@ -1936,7 +1942,8 @@ function Content() {
       const result = await approveJellyfinQuickConnect(
         { uuid, password: password || encryptedPassword || null },
         quickConnectCode,
-        quickConnectPersona || undefined
+        quickConnectPersona || undefined,
+        quickConnectLocked ? quickConnectPin : undefined
       );
       toast.success(
         result.device?.app
@@ -2698,6 +2705,11 @@ function Content() {
                           : 'The password is your configuration password.'}
                         {jellyfinPersonas.length > 0 &&
                           ' Add /<user> to sign in as a user.'}
+                        {(jellyfinPersonas.some((p) => p.lock) ||
+                          !!userData.jellyfin?.primary?.lock) &&
+                          (profileAlias
+                            ? ' For a user with a PIN, the password is the PIN.'
+                            : ' For a user with a PIN, add /<PIN> to the password.')}
                       </p>
                     </div>
 
@@ -2725,8 +2737,9 @@ function Content() {
                         </div>
                         <p className="text-xs text-gray-500">
                           Lists this configuration and its users at sign-in,
-                          with no password to type. It contains your password,
-                          so keep it within your household.
+                          with no password to type except a user&apos;s PIN. It
+                          contains your password, so keep it within your
+                          household.
                         </p>
                       </div>
                     )}
@@ -2779,11 +2792,12 @@ function Content() {
                             <Select
                               label="Sign in as"
                               value={quickConnectPersona || '__account__'}
-                              onValueChange={(value) =>
+                              onValueChange={(value) => {
                                 setQuickConnectPersona(
                                   value === '__account__' ? '' : value
-                                )
-                              }
+                                );
+                                setQuickConnectPin('');
+                              }}
                               options={[
                                 {
                                   label: jellyfinAccountName,
@@ -2796,11 +2810,30 @@ function Content() {
                               ]}
                             />
                           )}
+                          {quickConnectLocked && (
+                            <TextInput
+                              label="PIN"
+                              type="password"
+                              inputMode="numeric"
+                              autoComplete="off"
+                              help="This user has a PIN."
+                              value={quickConnectPin}
+                              onValueChange={(value) =>
+                                setQuickConnectPin(
+                                  value.replace(/\D/g, '').slice(0, 12)
+                                )
+                              }
+                            />
+                          )}
                           <div className="flex items-center gap-2">
                             <Button
                               onClick={approveQuickConnect}
                               intent="primary"
-                              disabled={approvingQuickConnect}
+                              disabled={
+                                approvingQuickConnect ||
+                                (quickConnectLocked &&
+                                  quickConnectPin.length < 4)
+                              }
                               loading={approvingQuickConnect}
                             >
                               Approve
@@ -2817,6 +2850,34 @@ function Content() {
                           </div>
                         </div>
                       )}
+                    </div>
+
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-sm font-medium text-white">
+                          Web app
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Browse, see what is playing and manage watch history
+                          in your browser.
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        intent="gray-outline"
+                        rounded
+                        className="w-full shrink-0 sm:w-auto"
+                        leftIcon={<MonitorPlay className="h-4 w-4" />}
+                        onClick={() =>
+                          window.open(
+                            `${jellyfinPickerUrl || jellyfinServerUrl}/web/`,
+                            '_blank',
+                            'noopener'
+                          )
+                        }
+                      >
+                        Open
+                      </Button>
                     </div>
 
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">

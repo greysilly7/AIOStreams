@@ -2,6 +2,12 @@ import { Router, type Request, type Response } from 'express';
 import {
   buildGenre,
   catalogHasCollections,
+  filmographyCredits,
+  findPerson,
+  recommendedPreviews,
+  sortCredits,
+  titlePreviews,
+  type FilmographyKind,
   collectionMembers,
   config as appConfig,
   contentItemType,
@@ -11,6 +17,7 @@ import {
   genreOptions,
   getCatalogPage,
   getWatchStateProvider,
+  isLeafEntry,
   knownCatalogKinds,
   latestSpellings,
   listResult,
@@ -73,6 +80,12 @@ function excludeTypes(req: Request, items: JellyfinItem[]): JellyfinItem[] {
   return excluded.size
     ? items.filter((i) => !excluded.has(String(i.Type).toLowerCase()))
     : items;
+}
+
+/** Jellyfin's SortOrder, when a request gives one. */
+function sortDescending(req: Request): boolean | undefined {
+  const order = qs(req, 'SortOrder');
+  return order ? order.toLowerCase().startsWith('desc') : undefined;
 }
 
 function filterByType(
@@ -198,10 +211,12 @@ function pageFilter(
   const excluded = excludedTypes(req);
   const userFiltered = hasUserFilters(req);
   return async (previews) => {
+    const evidence = await ctx.leafEvidence();
     const byType = previews.filter((p) => {
       const type = contentItemType(
         p.type,
-        isBoxsetEntry(p, opts.catalog)
+        isBoxsetEntry(p, opts.catalog),
+        isLeafEntry(p, evidence)
       ).toLowerCase();
       return (!types || types.has(type)) && !excluded.has(type);
     });
@@ -277,10 +292,10 @@ function send(
 }
 
 /** Rows in flight while building a shelf; each one costs a meta lookup. */
-const ROW_CONCURRENCY = 6;
+export const ROW_CONCURRENCY = 6;
 
 /** Runs `fn` over `items` with a few in flight, keeping the input order. */
-async function mapLimited<T, R>(
+export async function mapLimited<T, R>(
   items: T[],
   limit: number,
   fn: (item: T) => Promise<R>
@@ -473,6 +488,7 @@ async function handleItems(
         exactTotal: isKodi(ctx) && wantsTotal(req),
         cursorKey: `${ctx.scope()}|${filterShape(req, types)}|${pd.t}|${pd.i}`,
         select: pageFilter(req, ctx, types, { parentId }),
+        kinds: searchKindsFor(types),
       });
       const items = await itemsFromPreviews(ctx, page.items, { parentId });
       send(req, res, applySort(req, items), page.total, startIndex);
@@ -499,6 +515,26 @@ async function handleItems(
       if (p?.kind === 'descriptor' && p.descriptor.k === 'person')
         name = p.descriptor.n;
     }
+    const found = name ? await findPerson(ctx.userData, name) : null;
+    if (found) {
+      const kinds = types
+        ? (['movie', 'series'] as FilmographyKind[]).filter((k) => types.has(k))
+        : undefined;
+      const credits = sortCredits(
+        filmographyCredits(found.person, kinds),
+        qlist(req, 'SortBy'),
+        sortDescending(req)
+      );
+      const previews = await titlePreviews(
+        engine,
+        found.tmdb,
+        credits.slice(startIndex, startIndex + limit)
+      );
+      const items = await itemsFromPreviews(ctx, previews);
+      send(req, res, excludeTypes(req, items), credits.length, startIndex);
+      return;
+    }
+    // Without TMDB, a search for the name finds what it can.
     const previews = name ? await searchCatalogs(engine, name, limit) : [];
     const items = filterByType(await itemsFromPreviews(ctx, previews), types);
     send(req, res, items, items.length, 0);
@@ -791,7 +827,10 @@ router.get(
             (b.season ?? 0) - (a.season ?? 0) ||
             (b.episode ?? 0) - (a.episode ?? 0)
         );
-        const next = await nextUpForSeries(ctx, d.descriptor, rows[0], {
+        // Anchored on the last episode watched, as the shelf is; a row left by
+        // an unmarked episode or a favourite says nothing about progress.
+        const last = rows.find((r) => r.played || r.positionMs > 0);
+        const next = await nextUpForSeries(ctx, d.descriptor, last, {
           includeResumable,
         });
         if (next) items.push(next);
@@ -1047,8 +1086,21 @@ router.get(
     }
     const desc = d.descriptor;
     const meta = await getMetaLoose(ctx, desc.t, desc.i);
-    const genre = (meta?.genres ?? [])[0];
     const engine = await ctx.engine();
+    // TMDB's picks when it knows the title; else the top of its first genre.
+    const recommended = await recommendedPreviews(
+      engine,
+      ctx.userData,
+      meta ?? { id: desc.i, type: desc.t },
+      desc.k === 'movie' ? 'movie' : 'series',
+      limit
+    );
+    if (recommended) {
+      const items = await itemsFromPreviews(ctx, recommended);
+      send(req, res, items, items.length, 0);
+      return;
+    }
+    const genre = (meta?.genres ?? [])[0];
     if (genre) {
       for (const view of await ctx.views()) {
         if (

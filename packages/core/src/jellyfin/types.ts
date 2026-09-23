@@ -70,6 +70,8 @@ export interface MediaSourceRecord {
   subtitlesEnriched?: boolean;
   videoHash?: string;
   live: boolean;
+  /** Carries text only: an addon notice, a pipeline error or a statistic. */
+  notice?: boolean;
   extension: AiostreamsSourceExtension;
 }
 
@@ -101,6 +103,8 @@ export interface UserItemDataDto {
   PlaybackPositionTicks: number;
   PlayCount: number;
   IsFavorite: boolean;
+  /** False for a dropped show; a like is not kept. */
+  Likes?: boolean;
   Played: boolean;
   LastPlayedDate?: string;
   PlayedPercentage?: number;

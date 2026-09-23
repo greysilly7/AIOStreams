@@ -33,6 +33,8 @@ import { StreamContext, ExtendedMetadata } from './context.js';
 
 const logger = createLogger('filterer');
 
+const FILTER_SLICE_MS = 8;
+
 const releaseDateFormat = new Intl.DateTimeFormat(undefined, {
   year: 'numeric',
   month: 'short',
@@ -156,11 +158,15 @@ class StreamFilterer {
   private userData: UserData;
   private filterStatistics: FilterStatistics;
   private filterTimings: FilterTimings;
-  /** When true, statistic recording is a no-op (shadow evaluations). */
+  /** When true, statistic recording is a no-op (shadow evaluations).
+   *  filter() can run concurrently on one instance, so it may only be held
+   *  across synchronous code. Async callers take an explicit parameter. */
   private suppressStatistics = false;
   /** Ids of streams that survived filter() only through an included stream
    *  expression, pending re-evaluation on the aggregated set. */
   private expressionRescuedIds = new Set<string>();
+  /** filter() runs many times per request; the title caches key on identity. */
+  private requestedTitleStrings = new WeakMap<ExtendedMetadata, string[]>();
 
   constructor(userData: UserData) {
     this.userData = userData;
@@ -474,11 +480,22 @@ class StreamFilterer {
       });
     }
 
-    const requestedTitleStrings =
-      requestedMetadata?.titles?.map((t) => t.title) ?? [];
+    let requestedTitleStrings: string[] = [];
+    if (requestedMetadata) {
+      requestedTitleStrings =
+        this.requestedTitleStrings.get(requestedMetadata) ??
+        requestedMetadata.titles?.map((t) => t.title) ??
+        [];
+      this.requestedTitleStrings.set(requestedMetadata, requestedTitleStrings);
+    }
 
     if (requestedTitleStrings.length) {
+      let reconcileSliceStart = performance.now();
       for (const stream of streams) {
+        if (performance.now() - reconcileSliceStart >= FILTER_SLICE_MS) {
+          await new Promise((resolve) => setImmediate(resolve));
+          reconcileSliceStart = performance.now();
+        }
         if (!stream.parsedFile?.title) continue;
         const reconciled = reconcileParsedName(
           stream.parsedFile,
@@ -869,12 +886,13 @@ class StreamFilterer {
       return false;
     };
 
+    const titleMatchingOptions = {
+      mode: 'exact',
+      similarityThreshold: 0.85,
+      ...(this.userData.titleMatching ?? {}),
+    };
+
     const performTitleMatch = (stream: ParsedStream) => {
-      const titleMatchingOptions = {
-        mode: 'exact',
-        similarityThreshold: 0.85,
-        ...(this.userData.titleMatching ?? {}),
-      };
       if (!titleMatchingOptions || !titleMatchingOptions.enabled) {
         return true;
       }
@@ -1194,6 +1212,15 @@ class StreamFilterer {
           // assume season is 1 when empty and episode is present in strict mode.
           seasons = [1];
         }
+      }
+
+      if (
+        requestedMetadata?.tvdbSeason !== undefined &&
+        seasons?.includes(requestedMetadata.tvdbSeason) &&
+        (!stream.parsedFile?.episodes?.length ||
+          stream.parsedFile.episodes.includes(requestedMetadata.tvdbEpisode!))
+      ) {
+        return true;
       }
 
       if (
@@ -2521,7 +2548,15 @@ class StreamFilterer {
     }
 
     const filterPassStart = Date.now();
-    const filteredStreams = filterableStreams.filter(shouldKeepStream);
+    const filteredStreams: ParsedStream[] = [];
+    let filterSliceStart = performance.now();
+    for (const stream of filterableStreams) {
+      if (performance.now() - filterSliceStart >= FILTER_SLICE_MS) {
+        await new Promise((resolve) => setImmediate(resolve));
+        filterSliceStart = performance.now();
+      }
+      if (shouldKeepStream(stream)) filteredStreams.push(stream);
+    }
     filterPassMs = Date.now() - filterPassStart;
 
     // Included streams skip the filter pass, so shadow-evaluate them (without
@@ -2592,7 +2627,8 @@ class StreamFilterer {
 
   public async applyIncludedStreamExpressions(
     streams: ParsedStream[],
-    context: StreamContext
+    context: StreamContext,
+    suppressStatistics = false
   ): Promise<ParsedStream[]> {
     const expressionContext = context.toExpressionContext();
     const selector = new StreamSelector(expressionContext);
@@ -2608,7 +2644,7 @@ class StreamFilterer {
         typeof item === 'string' ? { expression: item, enabled: true } : item;
       if (!enabled) continue;
       const selectedStreams = await selector.select(streams, expression);
-      if (!this.suppressStatistics) {
+      if (!suppressStatistics) {
         this.filterStatistics.included.streamExpression.total +=
           selectedStreams.length;
         const displayCondition = this.getDisplayCondition(expression);
@@ -2641,19 +2677,17 @@ class StreamFilterer {
       return streams;
     }
     let globallyIncluded: ParsedStream[];
-    this.suppressStatistics = true;
     try {
       globallyIncluded = await this.applyIncludedStreamExpressions(
         streams,
-        context
+        context,
+        true
       );
     } catch (error) {
       logger.error(
         `Failed to re-evaluate included stream expressions on the full result set: ${error instanceof Error ? error.message : String(error)}`
       );
       return streams;
-    } finally {
-      this.suppressStatistics = false;
     }
     const globallyIncludedIds = new Set(globallyIncluded.map((s) => s.id));
     const keptStreams = streams.filter((stream) => {
